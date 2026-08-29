@@ -10,7 +10,7 @@ workshop. Ele será destruído ao final — pode experimentar à vontade.
 
 . No terminal ao lado, autentique-se:
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 oc login -u {user} -p {password} {openshift_api_url} --insecure-skip-tls-verify
 ----
@@ -31,7 +31,7 @@ todos os outros participantes ao mesmo tempo.
 
 . Clone o repositório:
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 git clone {repo_url} ~/rhcl && cd ~/rhcl
 ----
@@ -39,7 +39,7 @@ git clone {repo_url} ~/rhcl && cd ~/rhcl
 . Clone também o repositório deste workshop — é dele que vêm as verificações
   ao final de cada módulo:
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 git clone {workshop_repo_url} ~/workshop
 ----
@@ -100,7 +100,7 @@ bash scripts/preflight.sh core && echo "AMBIENTE PRONTO"
 Se o verificador acusar recursos ausentes, aplique a camada de demo e verifique
 de novo:
 
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 oc apply -k {overlay}
 bash scripts/preflight.sh core
