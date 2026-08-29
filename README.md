@@ -20,6 +20,7 @@ verificação a um bloco de `scripts/preflight.sh`.
 ## Estrutura
 
 ```
+scripts/workshop.sh              os três verbos: verifica / corrige / pula
 content/
   antora.yml                     atributos (hostname NUNCA fica aqui)
   modules/ROOT/
@@ -27,9 +28,33 @@ content/
     pages/                       11 páginas: índice, visão geral, ambiente,
                                  7 módulos e conclusão
 validation/
-  module-0X/validation.yml       verificação por módulo (Ansible puro)
+  module-0X/
+    validation.yml               verifica — afirma as tarefas do módulo
+    reset.yml                    corrige — estado inicial (quem quebrou algo)
+    solve.yml                    pula — estado final (quem não vai fazer)
 ui-config.yml                    tabs do painel direito (nookbag)
 ```
+
+## Os três verbos
+
+O participante decora um comando só:
+
+```bash
+bash scripts/workshop.sh verifica 2    # confere as tarefas do módulo
+bash scripts/workshop.sh corrige 2     # devolve o módulo ao estado INICIAL
+bash scripts/workshop.sh pula 6        # aplica o estado FINAL do módulo
+bash scripts/workshop.sh lista         # o que cada módulo tem disponível
+```
+
+`corrige` e `pula` têm alvos **opostos** — início e fim — e por isso são dois
+arquivos, não um com flag. Um `solve` usado como conserto pula o aprendizado sem
+avisar ninguém.
+
+`pula` é **cumulativo**: `pula 3` roda os `solve` de 1, 2 e 3, porque o estado
+final do módulo 3 pressupõe o dos anteriores. Todo `solve` é idempotente.
+
+Módulo que não muda estado — só leitura e medição — não tem `pula`. Pular esses
+é fechar a página, e o `lista` diz quais são.
 
 ## As verificações
 
