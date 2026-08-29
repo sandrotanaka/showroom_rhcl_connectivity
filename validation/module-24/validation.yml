@@ -1,0 +1,36 @@
+---
+- name: "2.4 — tracing configurado e coletando"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Existe Telemetry declarando o provedor de trace"
+      kubernetes.core.k8s_info:
+        api_version: telemetry.istio.io/v1
+        kind: Telemetry
+      register: r_tel
+      ignore_errors: true
+
+    - name: "Existe uma instancia do Tempo no cluster"
+      ansible.builtin.command: oc get pods -A -l app.kubernetes.io/name=tempo --no-headers
+      register: r_tempo
+      changed_when: false
+      failed_when: false
+
+    - name: "Consolidar"
+      ansible.builtin.set_fact:
+        _t1: "{{ r_tel.resources | default([]) | length > 0 }}"
+        _t2: "{{ (r_tempo.stdout | default('') | trim) | length > 0 }}"
+
+    - name: "Resultado"
+      ansible.builtin.assert:
+        that: [_t1 | bool, _t2 | bool]
+        success_msg: |
+          OK Telemetry declarando o provedor de trace
+          OK instancia do Tempo no ar
+        fail_msg: |
+          {{ 'OK  ' if _t1 else 'FALHOU' }} objeto Telemetry
+          {{ 'OK  ' if _t2 else 'FALHOU' }} pods do Tempo
+
+          A Telemetry da amostra:
+            oc apply -f ~/rhcl/samples/bookinfo/14-mesh-telemetry.yaml

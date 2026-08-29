@@ -1,0 +1,120 @@
+= 3.6 A policy nasce com o serviço
+:navtitle: 3.6 Golden path
+
+*Tempo: 25 minutos*
+
+Você passou o dia aplicando policies a uma aplicação que já existia. A objeção
+que sempre vem agora é: **"e o próximo serviço? alguém vai lembrar de tudo
+isso?"**
+
+Se a resposta for *"a plataforma faz, sob demanda"*, você tem uma fila de
+tickets. Se for *"o serviço já nasce com isso"*, você tem uma plataforma.
+
+== Objetivos
+
+* Criar um serviço novo pelo golden path do portal.
+* Verificar que ele nasce com as três camadas do dia já aplicadas.
+* Explicar por que o ponto do template não é digitar menos.
+
+== Exercício 1: os três templates
+
+. No portal, vá em *Create*. A ordem dos três templates é a jornada de uma API:
++
+[cols="1,2,2"]
+|===
+| Template | O que cria | Como entrega
+
+| *1. API como produto*
+| namespace já no Service Mesh, workload com ServiceAccount própria, `HTTPRoute`
+  no `prod-web`, `AuthPolicy`, `PlanPolicy`, `APIProduct`, mTLS `STRICT`,
+  `AuthorizationPolicy` e o par `DestinationRule`/`VirtualService`
+| repositório novo
+
+| *2. Assinar uma API*
+| o `APIKey` do developer portal
+| _pull request_
+
+| *3. Publicar uma v2*
+| a v2 ao lado da v1 e o peso na `VirtualService`
+| _pull request_
+|===
+
+== Exercício 2: criar
+
+. Execute o template *1. API como produto*, com um nome curto e seu.
+
+. Leia o formulário antes de submeter. Repare que ele **não pergunta se você quer
+  policy** — pergunta qual plano, qual identidade pode chamar, qual peso. As
+  decisões que custaram tempo estão fechadas na origem, inclusive o *fail-open* do
+  predicado de plano, que aparece como escolha explícita.
+
+. Acompanhe. O repositório gerado nasce com um *topic* que o `ApplicationSet`
+  descobre, e o Argo aplica — **não há passo de deploy**:
++
+[source,role="execute"]
+----
+oc get application -n openshift-gitops
+----
+
+== Exercício 3: conferir as três camadas
+
+O serviço novo já tem tudo o que você aplicou à mão hoje:
+
+[source,role="execute"]
+----
+NS=<o namespace que você criou>
+oc get peerauthentication,authorizationpolicy -n $NS     # trilha 2
+oc get httproute,authpolicy,planpolicy -n $NS            # trilha 3
+oc get application -n openshift-gitops | grep $NS        # trilha 1
+----
+
+== Exercício 4: do portal ao IDE
+
+No card *About* de qualquer componente, o link **Abrir no Dev Spaces** sobe um
+IDE em container com o repositório já aberto. Fecha a volta sem sair do navegador
+e sem instalar nada.
+
+[NOTE]
+====
+Se o link não estiver lá, o Dev Spaces não está instalado neste cluster — o
+catálogo omite o item em vez de publicar um destino morto.
+====
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 36
+----
+
+.Se falhar
+[%collapsible]
+====
+*O repositório foi criado mas nada subiu?* Sem o OpenShift GitOps o template abre
+o PR e gera os manifests, mas nada sincroniza:
+
+[source,role="execute"]
+----
+oc get applicationset -n openshift-gitops
+----
+
+*O template falhou ao criar o repositório?* A integração com o Git precisa de
+credencial válida — `bash ~/rhcl/scripts/preflight.sh` diz exatamente o que
+falta.
+====
+
+== O que isso significa
+
+O ponto do golden path **não é digitar menos**. É que um serviço novo não
+consegue nascer sem:
+
+* procedência — repositório, pipeline e GitOps (trilha 1);
+* identidade e fronteira interna — mTLS e autorização (trilha 2);
+* policy de borda e plano comercial (trilha 3).
+
+Compare com o caminho usual: o serviço nasce, vai para produção, e cada uma
+dessas três coisas vira um item de backlog da plataforma — que chega semanas
+depois, quando alguém lembra. A diferença não é ferramenta; é **onde a decisão
+mora**.
+
+Siga para xref:99-conclusao.adoc[Conclusão].

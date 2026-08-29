@@ -1,0 +1,18 @@
+---
+# 1.1 CORRIGE: remove a amostra para refazer a subida do zero.
+- name: "1.1 — corrige (estado inicial: sem bookinfo)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Remover o namespace da amostra
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Namespace
+        name: bookinfo
+        wait: true
+        wait_timeout: 180
+    - name: Pronto
+      ansible.builtin.debug:
+        msg: "Namespace bookinfo removido. O projeto no Git continua la."

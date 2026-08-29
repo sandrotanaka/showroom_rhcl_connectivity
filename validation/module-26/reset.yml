@@ -1,0 +1,28 @@
+---
+# 2.6 CORRIGE: remove breaker e atraso, e devolve as DestinationRule da amostra.
+- name: "2.6 — corrige (sem objetos de exercicio)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Remover o breaker do exercicio"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: networking.istio.io/v1
+        kind: DestinationRule
+        namespace: bookinfo
+        name: ratings-breaker
+
+    - name: "Remover as injecoes de falha"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: networking.istio.io/v1
+        kind: VirtualService
+        namespace: bookinfo
+        name: "{{ item }}"
+      loop: [ratings-lento, ratings-falha]
+
+    - name: "Restaurar as DestinationRule da amostra"
+      kubernetes.core.k8s:
+        state: present
+        src: "{{ lookup('env','HOME') }}/rhcl/samples/bookinfo/11-mesh-destinationrules.yaml"

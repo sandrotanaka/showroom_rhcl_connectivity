@@ -1,0 +1,131 @@
+= 3.1 A borda muda de dono
+:navtitle: 3.1 A borda muda de dono
+
+*Tempo: 18 minutos*
+
+A aplicação entra hoje pelo gateway que veio com ela. Comercial quer vender
+acesso — e para isso a borda precisa mudar de dono.
+
+== Objetivos
+
+* Distinguir o gateway da aplicação do gateway governado pela plataforma.
+* Mover as rotas de um para o outro, resolvendo o conflito de caminho.
+* Explicar por que dois gateways no mesmo cluster não é redundância.
+
+== Contexto: dois gateways, dois donos
+
+[cols="1,3"]
+|===
+| `bookinfo-gateway` | veio com a amostra, vive no namespace dela, classe `istio`. É o gateway **da aplicação**.
+| `prod-web` | vive em `ingress-gateway`, é governado pelo Connectivity Link e carrega policies de escopo de gateway. É o gateway **da plataforma**.
+|===
+
+. Veja os dois:
++
+[source,role="execute"]
+----
+oc get gateway -A
+----
+
+== Exercício 1: o conflito que precisa ser resolvido à mão
+
+A `HTTPRoute` do upstream já casa `/api/v1/products`. Se as duas camadas
+convivessem, esse caminho passaria pelo gateway da amostra — **sem chave** —
+enquanto o resto de `/api/v1` passaria pelo `prod-web` com chave.
+
+Uma API vendida com um caminho aberto por acidente é pior do que uma API aberta,
+porque ninguém sabe.
+
+. Confira o que a rota do upstream casa:
++
+[source,role="execute"]
+----
+oc get httproute bookinfo -n bookinfo -o jsonpath='{.spec.rules[*].matches}' | python3 -m json.tool
+----
+
+. Remova-a:
++
+[source,role="execute"]
+----
+oc delete httproute bookinfo -n bookinfo
+----
+
+== Exercício 2: as rotas novas
+
+A camada de Connectivity Link da amostra existe pronta, **fora** do
+`kustomization.yaml` — a amostra sobe primeiro como Istio puro, de propósito.
+
+. Veja o que ela traz:
++
+[source,role="execute"]
+----
+ls ~/rhcl/samples/bookinfo/rhcl/
+----
+
+. Aplique só as duas rotas, substituindo o domínio:
++
+[source,role="execute"]
+----
+D=$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}')
+for f in 20-httproute-ui.yaml 21-httproute-api.yaml; do
+  sed "s|__DOMAIN__|$D|g" ~/rhcl/samples/bookinfo/rhcl/$f | oc apply -f -
+done
+----
+
+[WARNING]
+====
+`oc apply -k` não serve aqui: as duas rotas trazem `__DOMAIN__`. Aplicar o
+diretório direto publicaria o literal no hostname.
+====
+
+== Exercício 3: o que acontece agora
+
+. Chame a UI pelo novo caminho:
++
+[source,role="execute"]
+----
+D=$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}')
+curl -sk -o /dev/null -w 'UI pelo prod-web -> %{http_code}\n' "https://bookinfo.$D/productpage"
+----
+
+. Você deve ver **`401`**.
+
+Não é erro seu. É a plataforma funcionando exatamente como foi configurada — e
+o próximo módulo é sobre por quê.
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 31
+----
+
+.Se falhar
+[%collapsible]
+====
+*A UI respondeu `200`?* A rota do upstream ainda existe e está atendendo. Confira:
+
+[source,role="execute"]
+----
+oc get httproute -n bookinfo
+----
+
+*A rota nova não aparece no `prod-web`?* Confira se ela foi aceita pelo gateway:
+
+[source,role="execute"]
+----
+oc get httproute bookinfo-ui -n bookinfo -o jsonpath='{.status.parents[*].conditions[*].message}{"\n"}'
+----
+====
+
+== O que isso significa
+
+Dois gateways não são redundância — são **duas fronteiras com donos
+diferentes**. O da aplicação pertence ao time que a escreveu; o da plataforma
+pertence a quem responde por quem entra, quanto passa e quanto isso custa.
+
+Mover a rota de um para o outro é o momento em que uma aplicação vira um
+**produto**. E o `401` que você acabou de receber é a primeira prova de que a
+mudança de dono foi real.
+
+Siga para xref:31-t3-duas-fronteiras.adoc[Módulo 3.2].

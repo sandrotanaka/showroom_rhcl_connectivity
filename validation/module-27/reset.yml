@@ -1,0 +1,11 @@
+---
+# 2.7 CORRIGE: devolve os pesos originais do canario.
+- name: "2.7 — corrige (canario 90/10 da amostra)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Restaurar a VirtualService de reviews"
+      kubernetes.core.k8s:
+        state: present
+        src: "{{ lookup('env','HOME') }}/rhcl/samples/bookinfo/12-mesh-virtualservice-reviews.yaml"

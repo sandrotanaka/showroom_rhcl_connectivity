@@ -1,0 +1,112 @@
+= 3.4 Precedência de policies
+:navtitle: 3.4 Precedência
+
+*Tempo: 15 minutos*
+
+Você já escreveu policies em dois escopos: uma no gateway, negando tudo, e várias
+nas rotas. Num cluster real são dezenas, escritas por times diferentes. A
+pergunta que decide se a plataforma é operável: **quem vence, e como eu
+descubro?**
+
+== Objetivos
+
+* Ler no status de uma policy que ela foi sobreposta, e por quem.
+* Enunciar a regra de precedência entre gateway e rota.
+* Reconhecer o que o grafo de topologia mostra e o que ele não mostra.
+
+== Exercício 1: a policy que não está valendo
+
+. Leia o status da policy que nega tudo:
++
+[source,role="execute"]
+----
+oc get authpolicy prod-web-deny-all -n ingress-gateway \
+  -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.message}){"\n"}{end}'
+----
+
+. Você deve ver algo como:
++
+----
+Accepted=True  (AuthPolicy has been accepted)
+Enforced=False (AuthPolicy is overridden by [bookinfo/bookinfo-ui-authpolicy
+                                             bookinfo/bookinfo-api-authpolicy ...])
+----
+
+Leia a segunda linha devagar. Ela não diz apenas que a policy foi sobreposta:
+**nomeia quem venceu**, rota por rota.
+
+A regra: *policies que miram o Gateway valem para toda rota anexada e cedem onde
+a rota declara a sua.* Foi por isso que a UI dava `401` antes do módulo 3.2 — não
+havia rota declarando nada, então a do gateway valia.
+
+== Exercício 2: o mesmo fork, desenhado
+
+. No console, abra *Connectivity Link* → *Policy Topology*:
++
+[source,role="execute"]
+----
+oc whoami --show-console
+----
+
+O listener bifurca para as rotas, e as policies chegam como aresta tracejada.
+
+[NOTE]
+====
+O grafo **não marca quem venceu** — não existe selo de *overridden* no desenho. O
+desenho faz a pergunta; o campo de status responde. Não perca tempo procurando na
+tela: você já leu a resposta no exercício anterior.
+====
+
+== Exercício 3: o que a policy gerou sozinha
+
+O `PlanPolicy` do módulo anterior tem poucas dezenas de linhas úteis. Veja o que
+ele produziu sem que ninguém escrevesse nada à mão:
+
+. Um contador por plano:
++
+[source,role="execute"]
+----
+oc get limitador limitador -n kuadrant-system -o jsonpath='{.spec.limits}' \
+  | python3 -m json.tool | head -30
+----
+
+. E os predicados por plano dentro do filtro do Envoy:
++
+[source,role="execute"]
+----
+oc get envoyfilter -n ingress-gateway
+----
+
+[NOTE]
+====
+Nesta release, sobre Service Mesh 3, o artefato de data plane é um `EnvoyFilter`.
+Em versões anteriores era um `WasmPlugin` — se você procurar por `wasmplugin`
+aqui, não encontra nada.
+====
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 34
+----
+
+.Se falhar
+[%collapsible]
+====
+*A `prod-web-deny-all` aparece como `Enforced=True`?* Então as policies de rota
+não estão sendo reconhecidas — e a UI estaria em `401`. Volte ao módulo 3.2.
+====
+
+== O que isso significa
+
+Numa stack montada com anotações de ingress ou filtro escrito à mão, descobrir
+qual regra prevaleceu é arqueologia: você lê configuração gerada, compara com o
+que achava que tinha aplicado, e adivinha. Aqui é um **campo de status**, e ele
+nomeia o vencedor.
+
+É isso que permite que dois times escrevam policy sobre o mesmo tráfego sem
+combinar antes. A plataforma define o padrão no gateway; o time da API
+especializa na rota; e a diferença entre os dois é auditável por `oc get`.
+
+Siga para xref:34-t3-metricas.adoc[Módulo 3.5].

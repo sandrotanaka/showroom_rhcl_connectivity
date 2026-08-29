@@ -1,0 +1,32 @@
+---
+# 3.2 PULA: UI publica por policy anonima, API sob chave por produto.
+- name: "3.2 — pula (duas fronteiras)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "AuthPolicy anonima para a UI"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: kuadrant.io/v1
+          kind: AuthPolicy
+          metadata: {name: bookinfo-ui-authpolicy, namespace: bookinfo}
+          spec:
+            targetRef:
+              group: gateway.networking.k8s.io
+              kind: HTTPRoute
+              name: bookinfo-ui
+            rules:
+              authentication:
+                anonimo:
+                  anonymous: {}
+
+    - name: "Protecao de capacidade na rota anonima, AuthPolicy e chaves da API"
+      kubernetes.core.k8s:
+        state: present
+        src: "{{ lookup('env','HOME') }}/rhcl/samples/bookinfo/rhcl/{{ item }}"
+      loop:
+        - 24-ratelimitpolicy-ui.yaml
+        - 22-authpolicy.yaml
+        - 26-identity-apikeys.yaml

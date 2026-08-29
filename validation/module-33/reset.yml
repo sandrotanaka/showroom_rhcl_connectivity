@@ -1,0 +1,36 @@
+---
+# 3.3 CORRIGE: devolve os limites originais e zera os contadores.
+#
+# Reaplicar o YAML nao basta: o Limitador guarda cada contador com o teto
+# vigente no momento em que ele foi criado, entao um contador existente segue
+# com o limite ANTIGO ate a janela virar -- 24h, no caso da cota diaria.
+- name: "3.3 — corrige (limites originais)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Reaplicar o PlanPolicy da amostra"
+      kubernetes.core.k8s:
+        state: present
+        force: true
+        src: "{{ lookup('env','HOME') }}/rhcl/samples/bookinfo/rhcl/23-planpolicy.yaml"
+
+    - name: "Reiniciar o Limitador"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Pod
+        namespace: kuadrant-system
+        label_selectors: [app=limitador]
+
+    - name: "Esperar voltar"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: kuadrant-system
+        label_selectors: [app=limitador]
+      register: r_lim
+      until: >-
+        r_lim.resources | selectattr('status.phase','equalto','Running') | list | length > 0
+      retries: 20
+      delay: 5

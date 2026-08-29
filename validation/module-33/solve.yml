@@ -1,0 +1,19 @@
+---
+# 3.3 PULA: aplica o PlanPolicy da amostra.
+- name: "3.3 — pula (planos comerciais)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Aplicar o PlanPolicy"
+      kubernetes.core.k8s:
+        state: present
+        src: "{{ lookup('env','HOME') }}/rhcl/samples/bookinfo/rhcl/23-planpolicy.yaml"
+
+    - name: "Reiniciar o Limitador para os contadores nascerem com o teto novo"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Pod
+        namespace: kuadrant-system
+        label_selectors: [app=limitador]

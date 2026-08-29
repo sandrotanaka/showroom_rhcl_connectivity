@@ -1,0 +1,41 @@
+---
+- name: "2.3 — metricas de servico sem instrumentacao"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Descobrir a rota do Thanos"
+      kubernetes.core.k8s_info:
+        api_version: route.openshift.io/v1
+        kind: Route
+        name: thanos-querier
+        namespace: openshift-monitoring
+      register: r_thanos
+
+    - name: "Obter o token da sessao"
+      ansible.builtin.command: oc whoami -t
+      register: r_token
+      changed_when: false
+    - name: "istio_requests_total para o namespace da aplicacao"
+      ansible.builtin.uri:
+        url: "https://{{ r_thanos.resources[0].spec.host }}/api/v1/query?query={{ 'sum by (destination_service_name) (istio_requests_total{destination_service_namespace=\"bookinfo\"})' | urlencode }}"
+        headers: {Authorization: "Bearer {{ r_token.stdout }}"}
+        validate_certs: false
+      register: r_q
+
+    - name: "Consolidar"
+      ansible.builtin.set_fact:
+        _servicos: "{{ r_q.json.data.result | default([]) | map(attribute='metric.destination_service_name') | select('defined') | unique | list }}"
+
+    - name: "Resultado"
+      ansible.builtin.assert:
+        that:
+          - _servicos | length >= 3
+        success_msg: |
+          OK metricas por servico no Thanos: {{ _servicos | join(' ') }}
+        fail_msg: |
+          FALHOU servicos com metrica: {{ _servicos | join(' ') | default('nenhum') }}
+
+          A coleta leva ate um minuto e a janela e curta. Gere trafego e espere:
+            URL="https://bookinfo.$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}')/productpage"
+            for i in $(seq 1 60); do curl -sk -o /dev/null "$URL"; done; sleep 60

@@ -1,0 +1,150 @@
+= 3.3 Planos comerciais
+:navtitle: 3.3 Planos comerciais
+
+*Tempo: 20 minutos*
+
+A API está fechada por chave. O comercial não vende "acesso": vende `free`,
+`silver` e `gold`, com cotas diferentes e um contrato atrás de cada uma.
+
+== Objetivos
+
+* Medir três planos lado a lado, na mesma rota e na mesma aplicação.
+* Identificar o que exatamente diferencia um plano do outro.
+* Mover a régua de um plano e ver o novo teto valendo.
+
+== Exercício 1: os planos
+
+. Aplique a policy de planos:
++
+[source,role="execute"]
+----
+oc apply -f ~/rhcl/samples/bookinfo/rhcl/23-planpolicy.yaml
+----
+
+. Leia-a antes de medir:
++
+[source,role="execute"]
+----
+cat ~/rhcl/samples/bookinfo/rhcl/23-planpolicy.yaml
+----
+
+Repare em duas coisas:
+
+* cada plano tem **dois** limites — a janela curta, que é a que aparece na tela,
+  e a cota diária, que é a que está no contrato e a que o portal publica;
+* o último plano é um **catch-all**. Ele não é enfeite: sem ele, uma identidade
+  que não casa com nenhum plano fica sem classificação, o filtro não chama o
+  limitador, e a requisição passa **sem limite**. *Fail-open*.
+
+== Exercício 2: medir os três
+
+. Dispare rajadas idênticas com cada chave:
++
+[source,role="execute"]
+----
+D=$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}')
+for tier in free silver gold; do
+  KEY=$(oc get secret -n kuadrant-system -l app=partner,kuadrant.io/plan-id=$tier \
+    -o jsonpath='{.items[0].data.api_key}' | base64 -d)
+  printf '%-8s ' "$tier"
+  for i in $(seq 1 14); do
+    curl -sk -o /dev/null -w '%{http_code} ' "https://bookinfo.$D/api/v1/products?APIKEY=$KEY"
+  done
+  echo; sleep 11
+done
+----
+
+. Você deve ver três linhas com pontos de corte diferentes — `200` até o teto do
+  plano, `429` depois.
+
+[NOTE]
+====
+Os `sleep 11` não são enfeite. A janela do contador é de 10 segundos; sem a
+pausa, um plano herdaria o `429` do plano anterior e você mediria a coisa errada.
+====
+
+== Exercício 3: o que muda entre um plano e outro
+
+Mesma rota. Mesma aplicação. Mesmo path. Duas coisas mudam, e só duas.
+
+. Um label no Secret da chave:
++
+[source,role="execute"]
+----
+oc get secrets -n kuadrant-system -l app=partner -L kuadrant.io/plan-id
+----
+
+. E a policy que lê esse label — que você já abriu no Exercício 1.
+
+== Exercício 4: mover a régua
+
+. Dobre o teto do plano `free`:
++
+[source,role="execute"]
+----
+oc patch planpolicy bookinfo-plans -n bookinfo --type=json \
+  -p="[{\"op\":\"replace\",\"path\":\"/spec/plans/2/limits/custom/0/limit\",\"value\":6}]"
+----
+
+. Reinicie os contadores. Este passo **não é opcional**:
++
+[source,role="execute"]
+----
+oc delete pod -n kuadrant-system -l app=limitador
+----
++
+[IMPORTANT]
+====
+O limitador guarda cada contador com o teto vigente no momento em que ele foi
+criado. Um contador existente continua com o limite **antigo** até a janela
+virar — 24 horas, no caso da cota diária. Sem reiniciar, você mede o valor velho
+e conclui que a edição não pegou.
+====
+
+. Meça de novo o `free` e confirme o novo ponto de corte. Depois devolva:
++
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh corrige 33
+----
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 33
+----
+
+.Se falhar
+[%collapsible]
+====
+*Os três planos deram resultados idênticos?* Provavelmente uma `RateLimitPolicy`
+plana está sobrepondo o `PlanPolicy` — nesta release a precedência entre as duas
+não é a que se espera:
+
+[source,role="execute"]
+----
+oc get ratelimitpolicy -n bookinfo
+----
+
+A `bookinfo-ui-ratelimit` mira a rota da **UI** e não deve interferir. Se houver
+outra mirando `bookinfo-api`, ela é a causa.
+
+*Todos deram `429` desde a primeira requisição?* A cota diária foi consumida.
+Reinicie os contadores como no Exercício 4.
+====
+
+== O que isso significa
+
+Vocabulário comercial — *free*, *silver*, *gold* — virou configuração, num objeto
+legível por quem não é desenvolvedor:
+
+* criar um plano novo é adicionar um bloco;
+* mover um cliente de plano é editar um label;
+* nenhuma das duas coisas passa por *build*, *deploy* ou janela de manutenção.
+
+É aqui que a maioria das plataformas de API para. Os três módulos seguintes são
+sobre o que vem depois: quem vence quando duas policies colidem, o que isso vira
+em número de negócio, e como o próximo serviço nasce já com tudo isso.
+
+Siga para xref:33-t3-precedencia.adoc[Módulo 3.4].

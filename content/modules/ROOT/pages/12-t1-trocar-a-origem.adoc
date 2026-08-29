@@ -1,0 +1,132 @@
+= 1.3 Trocar a origem das imagens
+:navtitle: 1.3 Trocar a origem
+
+*Tempo: 15 minutos*
+
+Você tem seis cópias assinadas no Quay do cluster. Os pods continuam rodando as
+imagens do upstream. Este módulo fecha essa distância.
+
+== Objetivos
+
+* Redirecionar a origem das imagens sem editar nenhum manifesto de workload.
+* Confirmar, no pod em execução, que a imagem mudou de origem.
+* Explicar por que o padrão do repositório é o upstream, e não a cópia.
+
+== Exercício 1: onde a origem é declarada
+
+. Abra o `kustomization.yaml` da amostra:
++
+[source,role="execute"]
+----
+sed -n '/A CÓPIA ASSINADA/,/^# ---/p' ~/rhcl/samples/bookinfo/kustomization.yaml
+----
+
+Há um bloco `images:` comentado. O `kustomize` reescreve a origem de uma imagem
+**sem tocar no Deployment** — o manifesto do workload continua dizendo
+`registry.istio.io`, e a substituição acontece na renderização.
+
+[NOTE]
+====
+Por que o padrão é o upstream: a amostra precisa subir num cluster onde a etapa
+de registry ainda não rodou. Apontar para o Quay por padrão colocaria uma
+demonstração de Service Mesh atrás de um registry — e ela falharia por um motivo
+que não tem nada a ver com o que ela quer mostrar.
+====
+
+== Exercício 2: apontar para a cópia
+
+. Descubra o host do Quay deste cluster:
++
+[source,role="execute"]
+----
+QUAY=$(oc get route -n quay -o jsonpath='{.items[0].spec.host}' 2>/dev/null \
+  || oc get route -A | grep -i quay | awk '{print $3}' | head -1)
+echo "$QUAY"
+----
+
+. Descomente o bloco `images:` e ajuste o host. Faça no editor, para ver o que
+  está mudando:
++
+[source,role="execute"]
+----
+vi ~/rhcl/samples/bookinfo/kustomization.yaml
+----
+
+. Confira o render **antes** de aplicar:
++
+[source,role="execute"]
+----
+oc kustomize ~/rhcl/samples/bookinfo | grep 'image:'
+----
+
+[WARNING]
+====
+Confira edição local com `oc create --dry-run=client`, nunca com
+`apply --dry-run`: o `apply` busca o objeto no cluster e imprime a **mesclagem**,
+então devolve um YAML plausível e errado justamente quando o arquivo mudou.
+====
+
+. Aplique:
++
+[source,role="execute"]
+----
+cd ~/rhcl && SAMPLES=bookinfo bash scripts/provision.sh samples
+----
+
+== Exercício 3: confirmar no que está rodando
+
+. Pergunte aos pods, não ao arquivo:
++
+[source,role="execute"]
+----
+oc get pods -n bookinfo -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[0].image}{"\n"}{end}'
+----
+
+. Todas as imagens devem começar pelo host do Quay do cluster.
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 13
+----
+
+.Se falhar
+[%collapsible]
+====
+*Os pods ficaram em `ImagePullBackOff`?* O cluster precisa de credencial para o
+Quay interno, ou a etapa de espelho não copiou aquela imagem. Veja qual:
+
+[source,role="execute"]
+----
+oc get events -n bookinfo --field-selector reason=Failed | tail -5
+----
+
+Para voltar ao upstream e seguir o workshop:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh corrige 13
+----
+====
+
+== O que isso significa
+
+Três linhas de YAML mudaram a origem de tudo o que roda, e **nenhum Deployment
+foi editado**. Isso importa porque o Deployment é do time da aplicação; a origem
+das imagens é da plataforma. Cada decisão ficou com seu dono, no seu arquivo.
+
+Com isso a trilha 1 fecha o ciclo que a auditoria pediu:
+
+[cols="1,3"]
+|===
+| *de onde veio* | um repositório Git, aplicado pelo Argo
+| *quem garante* | SonarQube no manifesto, ACS na imagem
+| *quem assinou e quando* | Tekton Chains, registrado no Rekor
+| *o que está rodando* | a cópia, e o `oc get pods` prova
+|===
+
+A trilha 2 muda de pergunta: a aplicação está no ar com procedência, mas os seis
+serviços conversam entre si em texto claro e sem controle nenhum.
+
+Siga para xref:20-t2-dentro-do-mesh.adoc[Trilha 2, módulo 1].

@@ -1,0 +1,45 @@
+---
+- name: "3.2 — duas fronteiras no mesmo hostname"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Descobrir o dominio de apps"
+      kubernetes.core.k8s_info:
+        api_version: config.openshift.io/v1
+        kind: Ingress
+        name: cluster
+      register: r_ing
+
+    - name: "A UI responde sem chave"
+      ansible.builtin.uri:
+        url: "https://bookinfo.{{ r_ing.resources[0].spec.domain }}/productpage"
+        validate_certs: false
+        status_code: [200, 401, 429]
+      register: r_ui
+
+    - name: "A API sem chave e recusada"
+      ansible.builtin.uri:
+        url: "https://bookinfo.{{ r_ing.resources[0].spec.domain }}/api/v1/products"
+        validate_certs: false
+        status_code: [200, 401, 429]
+      register: r_api
+
+    - name: "Consolidar"
+      ansible.builtin.set_fact:
+        _t1: "{{ r_ui.status == 200 }}"
+        _t2: "{{ r_api.status == 401 }}"
+
+    - name: "Resultado"
+      ansible.builtin.assert:
+        that: [_t1 | bool, _t2 | bool]
+        success_msg: |
+          OK a UI e publica (200) -- por uma policy que permite anonimo, nao pela ausencia de policy
+          OK a API sem chave e recusada (401)
+        fail_msg: |
+          {{ 'OK  ' if _t1 else 'FALHOU' }} UI sem chave devolveu {{ r_ui.status }} (esperado 200)
+          {{ 'OK  ' if _t2 else 'FALHOU' }} API sem chave devolveu {{ r_api.status }} (esperado 401)
+
+          UI em 401 significa que ela nao declarou policy propria e caiu no
+          prod-web-deny-all -- publico e uma decisao, nao um esquecimento:
+            bash ~/workshop/scripts/workshop.sh pula 32

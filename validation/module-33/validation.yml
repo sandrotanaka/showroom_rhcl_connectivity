@@ -1,0 +1,58 @@
+---
+- name: "3.3 — planos comerciais valendo"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "O PlanPolicy da API"
+      kubernetes.core.k8s_info:
+        api_version: extensions.kuadrant.io/v1alpha1
+        kind: PlanPolicy
+        namespace: bookinfo
+      register: r_plan
+
+    - name: "As chaves de parceiro"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        namespace: kuadrant-system
+        label_selectors: [app=partner]
+      register: r_keys
+
+    - name: "Os contadores no Limitador"
+      kubernetes.core.k8s_info:
+        api_version: limitador.kuadrant.io/v1alpha1
+        kind: Limitador
+        name: limitador
+        namespace: kuadrant-system
+      register: r_lim
+
+    - name: "Consolidar"
+      ansible.builtin.set_fact:
+        _tiers: "{{ r_keys.resources | default([]) | map(attribute='metadata.labels') | select('defined')
+                    | map(attribute='kuadrant.io/plan-id') | select('defined') | unique | list }}"
+        _limites: "{{ r_lim.resources[0].spec.limits | default([]) }}"
+
+    - name: "Consolidar (2)"
+      ansible.builtin.set_fact:
+        _t1: "{{ r_plan.resources | default([]) | length > 0 }}"
+        _t2: "{{ ['free','silver','gold'] | difference(_tiers) | length == 0 }}"
+        _t3: "{{ _limites | length >= 3 }}"
+
+    - name: "Resultado"
+      ansible.builtin.assert:
+        that: [_t1 | bool, _t2 | bool, _t3 | bool]
+        success_msg: |
+          OK PlanPolicy aplicado na rota da API
+          OK chaves cobrem os tres planos: {{ _tiers | sort | join(' ') }}
+          OK {{ _limites | length }} contadores no Limitador
+        fail_msg: |
+          {{ 'OK  ' if _t1 else 'FALHOU' }} PlanPolicy em bookinfo
+          {{ 'OK  ' if _t2 else 'FALHOU' }} tiers nas chaves: {{ _tiers | join(' ') | default('nenhum') }}
+          {{ 'OK  ' if _t3 else 'FALHOU' }} contadores: {{ _limites | length }}
+
+          Aplique o estado do modulo:
+            bash ~/workshop/scripts/workshop.sh pula 33
+          Se os tres planos mediram igual, procure uma RateLimitPolicy plana
+          mirando a rota da API -- ela sobrepoe o PlanPolicy:
+            oc get ratelimitpolicy -n bookinfo

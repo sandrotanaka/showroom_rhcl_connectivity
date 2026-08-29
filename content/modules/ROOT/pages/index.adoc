@@ -1,62 +1,75 @@
-= Red Hat Connectivity Link — do gateway à plataforma de API
+= Do repositório ao produto de API
 :navtitle: Boas-vindas
 
-Bem-vindo. Nas próximas duas horas você vai pegar uma API que já existe — sem
-tocar em uma linha do código dela — e transformá-la em um **produto** com três
-planos comerciais, cota por contrato, número de negócio no Grafana e uma
-fronteira interna que a chave de API não abre.
+Uma aplicação de seis microserviços. Três trilhas. Ao final, ela terá saído de
+um repositório Git, passado por uma cadeia de suprimento que lhe dá procedência,
+ganhado uma malha de identidade e resiliência que o código não conhece, e virado
+um produto de API com planos comerciais.
 
-Este workshop é autoguiado. Você tem um cluster OpenShift só seu, e cada módulo
-termina com uma verificação que confirma, na sua máquina, que o passo funcionou.
+Nenhuma linha do código dos seis serviços será alterada em nenhum momento.
 
-== Para quem é
+== As três trilhas
 
-Duas cadeiras, e o workshop precisa das duas:
+[cols="1,3,1"]
+|===
+| *Trilha 1* | *Do repositório ao cluster* — o portal, o GitOps sem passo de deploy, e a cadeia que assina, varre e registra o que entra em produção | ~70 min
+| *Trilha 2* | *Service Mesh* — identidade, observabilidade, tracing, injeção de falha, circuit breaker e canário | ~120 min
+| *Trilha 3* | *Connectivity Link* — a borda como produto: rotas, chaves, planos, precedência e métrica de negócio | ~115 min
+|===
+
+Com o ambiente e a conclusão, são cerca de **5h30**. As trilhas são
+independentes: cada uma pressupõe o estado final da anterior, e há um comando
+que aplica esse estado para quem quiser começar no meio.
+
+== A aplicação
+
+*Bookinfo* — a amostra canônica do Istio: `productpage` chama `details` e
+`reviews`, e `reviews` chama `ratings`. O serviço `reviews` tem **três versões**
+no cluster, e isso não é detalhe: é o que separa canário de troca de versão.
 
 [cols="1,3"]
 |===
-| *Engenharia de Plataforma*
-| Onde a policy mora, quem vence quando duas se sobrepõem, e o que a plataforma
-  garante sem pedir nada ao time de aplicação.
-
-| *Desenvolvimento*
-| Como um serviço novo nasce já com policy de borda, plano comercial e fronteira
-  leste-oeste — sem abrir um ticket para a plataforma.
+| `productpage` | a UI, em Python — a única coisa que o navegador vê
+| `details` | metadados do livro, em Ruby
+| `reviews` | as resenhas, em Java — *v1 sem estrelas, v2 com estrelas pretas, v3 com estrelas vermelhas*
+| `ratings` | as notas, em Node — só o `reviews` deveria chamá-lo
 |===
 
-A tese que os sete módulos defendem é uma só: **o Connectivity Link é uma
-plataforma de API, não um gateway**. O Módulo 6 é onde as duas cadeiras se
-encontram.
+== Para quem
 
-== O que você precisa saber antes
+Duas cadeiras, e as três trilhas precisam das duas:
 
-* `oc` na linha de comando — `get`, `apply`, `logs`. Nada além disso.
-* Noção de YAML. Você vai ler bastante e editar pouco.
-* Não é necessário conhecer Istio, Envoy, Kuadrant ou Gateway API. O workshop
-  apresenta cada um quando ele aparece.
+* *Desenvolvimento* — a trilha 1 inteira, o canário da 2 e o golden path da 3.
+* *Engenharia de Plataforma* — as policies da 2 e da 3, e a precedência entre elas.
 
-== Duração
+A tese que o dia defende: **plataforma é o que o serviço encontra pronto quando
+nasce.** Cada trilha entrega uma parte disso, e nenhuma delas pede alteração no
+código.
 
-Duas horas, distribuídas assim:
+== O que você precisa saber
 
-[cols="4,1"]
+`oc` na linha de comando e noção de YAML. Não é necessário conhecer Istio,
+Tekton, Kuadrant ou Backstage — cada um é apresentado quando aparece.
+
+== Como cada módulo funciona
+
+*Contexto* — a que pergunta este passo responde. +
+*Exercícios* — comandos, com o resultado esperado ao lado. +
+*Verificação* — um comando que confirma, e diz o que corrigir se falhar. +
+*O que isso significa* — a leitura que você leva embora.
+
+E três verbos, o dia inteiro:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh lista
+----
+
+[cols="1,3"]
 |===
-| xref:02-ambiente.adoc[Seu ambiente] — acesso, clone, verificação inicial | 10 min
-| xref:03-modulo-01-api-fechada.adoc[Módulo 1] — a API está fechada por padrão | 10 min
-| xref:04-modulo-02-planos.adoc[Módulo 2] — nem todo cliente é igual | 18 min
-| xref:05-modulo-03-precedencia.adoc[Módulo 3] — precedência é explícita | 14 min
-| xref:06-modulo-04-metricas.adoc[Módulo 4] — isso vira número de negócio | 14 min
-| xref:07-modulo-05-rastreabilidade.adoc[Módulo 5] — o caminho todo é rastreável | 10 min
-| xref:08-modulo-06-golden-path.adoc[Módulo 6] — a policy nasce com o serviço | 24 min
-| xref:09-modulo-07-leste-oeste.adoc[Módulo 7] — a borda não é a única fronteira | 14 min
-| xref:99-conclusao.adoc[Conclusão] e próximos passos | 6 min
+| `verifica <n>` | confere as tarefas do módulo. Não muda nada.
+| `corrige <n>` | devolve o módulo ao estado **inicial**, para refazer.
+| `pula <n>` | aplica o estado **final**, para quem vai pular aquela parte.
 |===
-
-[NOTE]
-====
-Se você ficar sem tempo, o Módulo 7 é o que pode ficar para depois — ele é sobre
-Service Mesh, não sobre Connectivity Link. Já o Módulo 6 não pule: é ele que
-sustenta a diferença entre plataforma e gateway.
-====
 
 Comece por xref:02-ambiente.adoc[Seu ambiente].

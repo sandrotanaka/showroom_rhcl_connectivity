@@ -1,0 +1,113 @@
+= 2.1 Dentro do Service Mesh
+:navtitle: 2.1 Dentro do Service Mesh
+
+*Tempo: 18 minutos*
+
+Os seis serviços estão no ar, com procedência. Agora a pergunta muda de lado: o
+que acontece **entre** eles?
+
+== Objetivos
+
+* Identificar o sidecar e o que ele passa a decidir.
+* Demonstrar que nenhum serviço aceita conexão em texto claro.
+* Distinguir uma conexão recusada de uma requisição negada.
+
+== Exercício 1: o segundo contêiner
+
+. Repare no `2/2`:
++
+[source,role="execute"]
+----
+oc get pods -n bookinfo
+----
+
+. Veja quem é o segundo:
++
+[source,role="execute"]
+----
+oc get pod -n bookinfo -l app=ratings -o jsonpath='{.items[0].spec.containers[*].name}{"\n"}'
+----
+
+O segundo contêiner é um Envoy. Ele não foi declarado em nenhum manifesto da
+aplicação — o Service Mesh o injetou porque o namespace pede injeção. Todo o
+tráfego que entra e sai do pod passa por ele.
+
+== Exercício 2: ninguém fala em texto claro
+
+. Confirme o modo:
++
+[source,role="execute"]
+----
+oc get peerauthentication -n bookinfo -o jsonpath='{.items[0].spec.mtls.mode}{"\n"}'
+----
+
+. Bata no `ratings` a partir de um pod **de fora** do Service Mesh:
++
+[source,role="execute"]
+----
+oc run mtls-probe -n default --image=registry.access.redhat.com/ubi9/ubi-minimal \
+  --restart=Never --rm -i -- curl -s -m 6 -o /dev/null \
+  -w 'HTTP=%{http_code} exit=%{exitcode}\n' \
+  http://ratings.bookinfo:9080/ratings/0
+----
+
+. Você deve ver `HTTP=000 exit=56`.
+
+Leia com atenção: não houve `403`, não houve `401` — **não houve HTTP**. A
+conexão foi resetada. O servidor derrubou antes de ler qualquer coisa, porque o
+cliente não apresentou certificado.
+
+[IMPORTANT]
+====
+Em modo `PERMISSIVE`, a mesma sonda devolveria `403`: a conexão completaria e
+quem recusaria seria a `AuthorizationPolicy` do próximo módulo. Os dois
+resultados se parecem na tela e são camadas diferentes — e correções opostas.
+====
+
+== Exercício 3: de onde vem o mTLS
+
+. Veja o arquivo:
++
+[source,role="execute"]
+----
+cat ~/rhcl/samples/bookinfo/10-mesh-peerauthentication.yaml
+----
+
+Uma única origem para o fato. O upstream do Istio também declara `ISTIO_MUTUAL`
+nas `DestinationRule` — duas origens para a mesma verdade fariam a resposta a
+*"de onde vem o mTLS?"* depender de qual arquivo alguém abriu primeiro.
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 21
+----
+
+.Se falhar
+[%collapsible]
+====
+*A sonda devolveu `403` em vez de `000`?* O modo está `PERMISSIVE`. Confirme com
+o Exercício 2 e aplique o estado do módulo:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh pula 21
+----
+
+*A sonda devolveu `200`?* Não há `PeerAuthentication` no namespace, ou o pod de
+origem também está no Service Mesh — confira em qual namespace você o criou.
+====
+
+== O que isso significa
+
+Criptografia entre serviços é a primeira coisa que aparece em auditoria e a
+última que times de aplicação implementam, porque exige certificado, rotação e
+biblioteca em quatro linguagens diferentes — e aqui foram **oito linhas de
+YAML**, aplicadas ao namespace.
+
+O que você não fez: distribuir certificado, alterar código, reiniciar serviço por
+serviço. O que você ganhou: a garantia de que ninguém fala em texto claro, mesmo
+que um serviço novo suba amanhã sem saber que a regra existe.
+
+Siga para xref:21-t2-identidade.adoc[Módulo 2.2].

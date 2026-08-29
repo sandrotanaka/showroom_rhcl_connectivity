@@ -1,0 +1,54 @@
+---
+- name: "2.2 — autorizacao por identidade SPIFFE"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "As tres AuthorizationPolicy existem"
+      kubernetes.core.k8s_info:
+        api_version: security.istio.io/v1
+        kind: AuthorizationPolicy
+        namespace: bookinfo
+      register: r_ap
+
+    - name: "Um vizinho com ServiceAccount errada e recusado"
+      ansible.builtin.shell: |
+        oc run authz-check -n bookinfo --image=registry.access.redhat.com/ubi9/ubi-minimal \
+          --restart=Never --rm -i --quiet -- curl -s -m 6 \
+          http://ratings:9080/ratings/0 2>/dev/null || true
+      args: {executable: /bin/bash}
+      register: r_neg
+      changed_when: false
+      failed_when: false
+
+    - name: "O caminho legitimo continua funcionando"
+      ansible.builtin.shell: |
+        set -o pipefail
+        P=$(oc get pod -n bookinfo -l app=reviews -o name | head -1)
+        oc exec -n bookinfo "$P" -c reviews -- \
+          curl -s -m 6 -o /dev/null -w '%{http_code}' http://ratings:9080/ratings/0
+      args: {executable: /bin/bash}
+      register: r_ok
+      changed_when: false
+      failed_when: false
+
+    - name: "Consolidar"
+      ansible.builtin.set_fact:
+        _t1: "{{ r_ap.resources | default([]) | length >= 3 }}"
+        _t2: "{{ 'RBAC: access denied' in (r_neg.stdout | default('')) }}"
+        _t3: "{{ (r_ok.stdout | default('') | trim) == '200' }}"
+
+    - name: "Resultado"
+      ansible.builtin.assert:
+        that: [_t1 | bool, _t2 | bool, _t3 | bool]
+        success_msg: |
+          OK {{ r_ap.resources | length }} AuthorizationPolicy no namespace
+          OK vizinho com SA errada recusado (RBAC: access denied)
+          OK reviews -> ratings continua 200
+        fail_msg: |
+          {{ 'OK  ' if _t1 else 'FALHOU' }} AuthorizationPolicy encontradas: {{ r_ap.resources | default([]) | length }}
+          {{ 'OK  ' if _t2 else 'FALHOU' }} vizinho recusado (recebido: {{ r_neg.stdout | default('nada') | truncate(40) }})
+          {{ 'OK  ' if _t3 else 'FALHOU' }} caminho legitimo (recebido: {{ r_ok.stdout | default('nada') }})
+
+          Aplique o estado do modulo:
+            bash ~/workshop/scripts/workshop.sh pula 22

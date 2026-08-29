@@ -1,0 +1,123 @@
+= 3.5 Métrica de negócio
+:navtitle: 3.5 Métrica de negócio
+
+*Tempo: 18 minutos*
+
+Você mediu os planos no terminal. A diretoria não abre terminal. A pergunta
+agora é: **o plano comercial aparece no painel?**
+
+== Objetivos
+
+* Consultar consumo e limite quebrados por plano.
+* Identificar qual policy adiciona a dimensão de negócio à métrica.
+* Reconhecer um limite real desta release, antes de prometê-lo a um cliente.
+
+== Exercício 1: a dimensão que falta por padrão
+
+. Pergunte ao Thanos quantas requisições foram limitadas:
++
+[source,role="execute"]
+----
+TOKEN=$(oc whoami -t)
+THANOS=$(oc get route thanos-querier -n openshift-monitoring -o jsonpath='{.spec.host}')
+curl -sk -H "Authorization: Bearer $TOKEN" "https://${THANOS}/api/v1/query" \
+  --data-urlencode 'query=sum(limited_calls)' | python3 -m json.tool
+----
+
+Isso responde *"quantos 429 houve"*. Não responde *"o plano free está
+saturando"* — que é a pergunta que a área comercial faz.
+
+== Exercício 2: quem adiciona o plano à métrica
+
+. A dimensão vem de uma `TelemetryPolicy`, e ela já existe neste cluster:
++
+[source,role="execute"]
+----
+oc get telemetrypolicy -A
+oc get telemetrypolicy prod-web-telemetry -n ingress-gateway -o yaml | grep -A12 'spec:'
+----
+
+. Agora a mesma consulta, quebrada por plano:
++
+[source,role="execute"]
+----
+TOKEN=$(oc whoami -t)
+THANOS=$(oc get route thanos-querier -n openshift-monitoring -o jsonpath='{.spec.host}')
+curl -sk -H "Authorization: Bearer $TOKEN" "https://${THANOS}/api/v1/query" \
+  --data-urlencode 'query=sum by (plan) (authorized_calls)' | python3 -m json.tool
+----
+
+[IMPORTANT]
+====
+*Um limite desta release, medido:* a `TelemetryPolicy` só aceita **`Gateway`**
+como alvo. Uma policy mirando uma `HTTPRoute` é recusada pelo servidor:
+
+----
+Invalid targetRef.kind. The only supported value is 'Gateway'
+----
+
+Isso é diferente de `AuthPolicy`, `RateLimitPolicy` e `PlanPolicy`, que aceitam
+rota. Na prática: a dimensão de negócio é do **gateway inteiro**, e vale para
+todas as rotas nele. Vale saber disso antes de prometer "métrica por rota" a um
+cliente.
+====
+
+== Exercício 3: o painel
+
+. Abra o Grafana:
++
+[source,role="execute"]
+----
+oc get route -A -l app.kubernetes.io/name=grafana -o jsonpath='https://{.items[0].spec.host}{"\n"}' 2>/dev/null \
+  || oc get route -A | grep -i grafana
+----
+
+. Procure o dashboard de planos comerciais. Os primeiros painéis são a rajada; o
+  último é a cota consumida por plano.
+
+A diferença entre eles é a diferença entre operação e contrato: a rajada é o que
+acontece agora; a cota é o que está assinado.
+
+[WARNING]
+====
+Os dashboards de fábrica **agregam sem quebrar por plano** — são anteriores à
+`TelemetryPolicy`. Não procure plano comercial neles.
+====
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 35
+----
+
+.Se falhar
+[%collapsible]
+====
+*Nenhuma série no Thanos?* A coleta leva até um minuto. Gere tráfego e espere:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh pula 33
+----
+
+*Séries existem mas sem o label `plan`?* A `TelemetryPolicy` não está valendo:
+
+[source,role="execute"]
+----
+oc get telemetrypolicy prod-web-telemetry -n ingress-gateway \
+  -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\n"}{end}'
+----
+====
+
+== O que isso significa
+
+Uma plataforma de API que não produz número de negócio obriga alguém a montar o
+relatório por fora — exportando log e cruzando planilha. Aqui a dimensão
+comercial entra na métrica **na borda**, no mesmo ponto onde a decisão foi
+tomada, por uma policy declarativa.
+
+O efeito prático: a mesma consulta que o SRE usa para ver saturação, o comercial
+usa para ver consumo por contrato. Uma fonte, duas leituras.
+
+Siga para xref:35-t3-golden-path.adoc[Módulo 3.6].

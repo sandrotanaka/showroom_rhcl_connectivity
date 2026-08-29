@@ -1,0 +1,121 @@
+= 2.5 Fault injection
+:navtitle: 2.5 Fault injection
+
+*Tempo: 18 minutos*
+
+Você sabe como a aplicação se comporta quando tudo funciona. A pergunta que
+ninguém testa antes da madrugada de domingo é: **e quando não funciona?**
+
+== Objetivos
+
+* Injetar falha num serviço sem alterá-lo nem derrubá-lo.
+* Observar a degradação na interface, no grafo e no trace.
+* Distinguir degradação graciosa de falha em cascata.
+
+== Exercício 1: derrubar o `ratings`, sem derrubar o `ratings`
+
+. Injete `503` em 100% das chamadas ao `ratings`:
++
+[source,role="execute"]
+----
+oc apply -f - <<'YAML'
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: ratings-falha
+  namespace: bookinfo
+spec:
+  hosts: [ratings]
+  http:
+    - fault:
+        abort:
+          percentage: {value: 100}
+          httpStatus: 503
+      route:
+        - destination: {host: ratings}
+YAML
+----
+
+. Confirme que o `ratings` continua saudável:
++
+[source,role="execute"]
+----
+oc get pods -n bookinfo -l app=ratings
+----
+
+O pod está `Running 2/2`. A falha não está no serviço — está no **caminho até
+ele**, e quem a produz é o sidecar do chamador.
+
+== Exercício 2: o que o usuário vê
+
+. Recarregue a página algumas vezes:
++
+[source,role="execute"]
+----
+echo "https://bookinfo.$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}')/productpage"
+----
+
+. Você deve ver a página **carregando normalmente**, com o bloco de resenhas
+  dizendo que as notas estão indisponíveis — e não um erro 500 na página inteira.
+
+Isso é **degradação graciosa**, e é uma propriedade do código do `reviews`, não
+do Service Mesh. O Service Mesh permitiu que você a *testasse*.
+
+== Exercício 3: onde a falha aparece
+
+. No *Traffic Graph*, a aresta `reviews → ratings` fica vermelha, com 100% de
+  erro. O `ratings` em si continua verde: ele não recebeu nada.
+
+. Num trace, o span da chamada ao `ratings` aparece com o status de erro, e a
+  duração é **curta** — a falha foi injetada antes da rede, não depois de um
+  timeout.
+
+== Exercício 4: reverter
+
+[source,role="execute"]
+----
+oc delete virtualservice ratings-falha -n bookinfo
+----
+
+[WARNING]
+====
+Não use este cenário para demonstrar *retry* ou *timeout*. Os dois testes óbvios
+falham em silêncio: um `retry` sobre uma falha injetada em 100% das chamadas
+repete o mesmo erro, e um `timeout` sobre um `abort` imediato nunca é atingido.
+Para exercitar retry é preciso injetar **atraso**, não erro — e aí o próximo
+módulo é um lugar melhor para a conversa.
+====
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 25
+----
+
+.Se falhar
+[%collapsible]
+====
+*A página inteira quebrou, em vez de degradar?* Confira se você injetou no
+`ratings` e não no `reviews` — derrubar o `reviews` derruba o bloco inteiro,
+porque o `productpage` não tem *fallback* para ele.
+
+*A falha não apareceu?* A `VirtualService` pode não ter casado o host. Confira:
+
+[source,role="execute"]
+----
+oc get virtualservice -n bookinfo
+----
+====
+
+== O que isso significa
+
+Testar comportamento de falha normalmente exige um ambiente de caos, um agente
+dentro do pod, ou coragem em produção. Aqui foi um objeto declarativo, aplicado e
+removido em segundos, sem tocar em nenhum dos seis serviços.
+
+E o resultado tem valor para além do teste: você **descobriu** que o `reviews`
+degrada com elegância e que o `productpage` não degrada se o `reviews` cair. Essa
+é uma informação de arquitetura que ninguém tinha escrito em lugar nenhum.
+
+Siga para xref:25-t2-resiliencia.adoc[Módulo 2.6].

@@ -1,0 +1,36 @@
+---
+- name: "3.4 — a precedencia esta legivel no status"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "A AuthPolicy de escopo de gateway"
+      kubernetes.core.k8s_info:
+        api_version: kuadrant.io/v1
+        kind: AuthPolicy
+        name: prod-web-deny-all
+        namespace: ingress-gateway
+      register: r_deny
+
+    - name: "Consolidar"
+      ansible.builtin.set_fact:
+        _cond: "{{ r_deny.resources[0].status.conditions | default([]) }}"
+    - name: "Consolidar (2)"
+      ansible.builtin.set_fact:
+        _aceita: "{{ _cond | selectattr('type','equalto','Accepted') | selectattr('status','equalto','True') | list | length > 0 }}"
+        _cedeu: "{{ _cond | selectattr('type','equalto','Enforced') | selectattr('status','equalto','False') | list | length > 0 }}"
+        _msg: "{{ (_cond | selectattr('type','equalto','Enforced') | map(attribute='message') | first) | default('sem mensagem') }}"
+
+    - name: "Resultado"
+      ansible.builtin.assert:
+        that: [_aceita | bool, _cedeu | bool]
+        success_msg: |
+          OK prod-web-deny-all Accepted=True, Enforced=False
+             e o status NOMEIA quem venceu: {{ _msg }}
+        fail_msg: |
+          {{ 'OK  ' if _aceita else 'FALHOU' }} a policy do gateway foi aceita
+          {{ 'OK  ' if _cedeu else 'FALHOU' }} ela cedeu para as policies de rota
+             status atual: {{ _msg }}
+
+          Enforced=True aqui significa que nenhuma rota declarou policy propria --
+          e a UI estaria em 401. Volte ao modulo 3.2.

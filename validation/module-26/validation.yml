@@ -1,0 +1,46 @@
+---
+# 2.6 -- circuit breaker. O modulo tambem termina limpo: os objetos de
+# exercicio saem, e o que fica e o estado da amostra.
+- name: "2.6 — o circuit breaker foi exercitado e o ambiente esta limpo"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "DestinationRule no namespace"
+      kubernetes.core.k8s_info:
+        api_version: networking.istio.io/v1
+        kind: DestinationRule
+        namespace: bookinfo
+      register: r_dr
+
+    - name: "VirtualService no namespace"
+      kubernetes.core.k8s_info:
+        api_version: networking.istio.io/v1
+        kind: VirtualService
+        namespace: bookinfo
+      register: r_vs
+
+    - name: "Consolidar"
+      ansible.builtin.set_fact:
+        _subsets_reviews: "{{ r_dr.resources | default([])
+                              | selectattr('metadata.name','equalto','reviews')
+                              | map(attribute='spec.subsets') | first | default([]) }}"
+        _exercicio: "{{ (r_dr.resources | default([]) | map(attribute='metadata.name') | list)
+                        | intersect(['ratings-breaker'])
+                        + (r_vs.resources | default([]) | map(attribute='metadata.name') | list)
+                        | intersect(['ratings-lento','ratings-falha']) }}"
+
+    - name: "Resultado"
+      ansible.builtin.assert:
+        that:
+          - _subsets_reviews | length == 3
+          - _exercicio | length == 0
+        success_msg: |
+          OK os tres subsets de reviews continuam declarados
+          OK nenhum objeto de exercicio ficou para tras
+        fail_msg: |
+          {{ 'OK  ' if _subsets_reviews | length == 3 else 'FALHOU' }} subsets de reviews: {{ _subsets_reviews | length }}
+          {{ 'OK  ' if _exercicio | length == 0 else 'FALHOU' }} sobrou: {{ _exercicio | join(' ') }}
+
+          Limpe o exercicio:
+            bash ~/workshop/scripts/workshop.sh corrige 26

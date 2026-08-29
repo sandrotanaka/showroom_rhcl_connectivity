@@ -1,0 +1,20 @@
+---
+# 2.5 CORRIGE: remove qualquer injecao de falha deixada para tras.
+- name: "2.5 — corrige (sem injecao de falha)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Remover as VirtualService de exercicio"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: networking.istio.io/v1
+        kind: VirtualService
+        namespace: bookinfo
+        name: "{{ item }}"
+      loop: [ratings-falha, ratings-lento]
+
+    - name: "Restaurar a VirtualService de canario da amostra"
+      kubernetes.core.k8s:
+        state: present
+        src: "{{ lookup('env','HOME') }}/rhcl/samples/bookinfo/12-mesh-virtualservice-reviews.yaml"

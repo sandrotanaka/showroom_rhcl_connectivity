@@ -1,0 +1,135 @@
+= 1.1 O catálogo e o GitOps
+:navtitle: 1.1 Catálogo e GitOps
+
+*Tempo: 25 minutos*
+
+A auditoria quer saber de onde vem o que roda em produção. A primeira metade da
+resposta não é técnica: é *"existe um lugar onde está escrito, e o cluster
+obedece a ele"*.
+
+== Objetivos
+
+* Encontrar a aplicação no portal antes de ela existir no cluster.
+* Colocar a aplicação no ar sem executar nenhum comando de deploy.
+* Explicar por que "não há passo de deploy" é uma propriedade, e não um atalho.
+
+== Exercício 1: o portal
+
+. Abra o Red Hat Developer Hub:
++
+[source,role="execute"]
+----
+oc get route -A -l app.kubernetes.io/name=developer-hub \
+  -o jsonpath='https://{.items[0].spec.host}{"\n"}'
+----
+
+. No catálogo, procure o componente *bookinfo*. Ele tem abas que ainda não têm o
+  que mostrar — *CI*, *Kubernetes* — porque a aplicação não subiu. **A entidade
+  existe antes do workload**, e isso é intencional: o catálogo descreve o que a
+  organização tem, não o que está rodando neste instante.
+
+== Exercício 2: o repositório
+
+O GitLab do cluster guarda o que a plataforma demonstra. Cada amostra vive em
+`rhcl/samples/<nome>`.
+
+. Descubra o endereço e entre:
++
+[source,role="execute"]
+----
+oc get route -A -l app=gitlab -o jsonpath='https://{.items[0].spec.host}{"\n"}' 2>/dev/null \
+  || oc get route -A | grep -i gitlab
+----
+
+. Abra `rhcl/samples/bookinfo`. São os manifestos, um arquivo por serviço, com
+  prefixo numérico — a ordem é a da explicação, não do acaso.
+
+== Exercício 3: subir sem deploy
+
+. Aplique a amostra:
++
+[source,role="execute"]
+----
+cd ~/rhcl && SAMPLES=bookinfo bash scripts/provision.sh samples
+----
+
+[NOTE]
+====
+Por que um script e não `oc apply -k`: os manifestos de `Route` trazem
+`__DOMAIN__`, que o script substitui pelo domínio deste cluster. Aplicar o
+diretório direto publicaria uma rota com o literal `__DOMAIN__` no hostname.
+====
+
+. Em cerca de 45 segundos, seis pods em `Running 2/2` — dois contêineres cada,
+  porque o *sidecar* do Service Mesh foi injetado:
++
+[source,role="execute"]
+----
+oc get pods -n bookinfo
+----
+
+. Veja quem está aplicando daqui para frente:
++
+[source,role="execute"]
+----
+oc get applicationset -n openshift-gitops
+oc get application -n openshift-gitops | grep -i sample
+----
+
+O `ApplicationSet` descobre projetos pelo subgrupo `rhcl/samples` e cria uma
+`Application` por amostra. Daqui em diante, o que estiver no Git é o que está no
+cluster.
+
+== Exercício 4: a aplicação no ar
+
+. Descubra a rota e abra:
++
+[source,role="execute"]
+----
+echo "https://bookinfo.$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}')/productpage"
+----
+
+. Recarregue a página algumas vezes. As estrelas mudam: **90% das vezes sem
+  estrelas, 10% com estrelas vermelhas** — e nunca pretas.
+
+Guarde essa observação. Ela volta no xref:26-t2-canario.adoc[módulo 2.7], e a
+explicação não é a que a maioria das pessoas chuta.
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 11
+----
+
+.Se falhar
+[%collapsible]
+====
+*Os pods estão `1/2` em vez de `2/2`?* O sidecar não foi injetado. Confira o
+label do namespace:
+
+[source,role="execute"]
+----
+oc get ns bookinfo --show-labels
+----
+
+*O `Gateway` diz `Programmed=False` mas a página responde?* Isto é conhecido e
+**não é defeito**: a `GatewayClass istio` cria o Service como `LoadBalancer` por
+padrão, e não há LoadBalancer neste ambiente. Quem publica é o `Route` do
+OpenShift. Se o seu manifesto tiver a anotação
+`networking.istio.io/service-type: ClusterIP`, o estado fica coerente.
+====
+
+== O que isso significa
+
+Você não executou `oc apply` da aplicação — executou um script que **semeia** e
+deixa o Argo aplicar. A diferença aparece na pergunta da auditoria: *"quem pode
+mudar o que roda em produção?"*. A resposta deixou de ser "quem tem `oc` e
+permissão" e passou a ser "quem pode fazer merge".
+
+E repare no que ainda **não** foi respondido: de onde vêm as seis imagens. Elas
+vêm de `registry.istio.io`, um registry de terceiro, sem varredura e sem
+assinatura — exatamente o que a maioria das organizações põe em produção sem
+pensar. É o assunto do próximo módulo.
+
+Siga para xref:11-t1-procedencia.adoc[Módulo 1.2].

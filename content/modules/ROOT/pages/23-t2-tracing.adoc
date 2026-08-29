@@ -1,0 +1,91 @@
+= 2.4 Tracing
+:navtitle: 2.4 Tracing
+
+*Tempo: 15 minutos*
+
+O grafo diz que uma aresta está lenta. Ele não diz onde o tempo foi.
+
+== Objetivos
+
+* Seguir uma requisição da borda até o último serviço, num único timeline.
+* Identificar qual span carrega o tempo.
+* Reconhecer o que exige mudança na aplicação e o que não exige.
+
+== Exercício 1: encontrar um trace
+
+. No console, vá em *Observe* → *Traces*, instância `tempo`. Selecione o serviço
+  do `productpage` e abra um trace com duração alta.
+
+. Você deve ver a hierarquia:
++
+----
+productpage
+  ├─ details.bookinfo
+  └─ reviews.bookinfo
+        └─ ratings.bookinfo
+----
+
+== Exercício 2: quem produz os spans
+
+. A configuração de amostragem e o provedor vêm de um objeto de Service Mesh, não
+  da aplicação:
++
+[source,role="execute"]
+----
+cat ~/rhcl/samples/bookinfo/14-mesh-telemetry.yaml
+----
+
+. Cada sidecar cria um span para o que entra e o que sai do seu pod.
+
+[IMPORTANT]
+====
+Aqui está o limite honesto do tracing sem instrumentação: o sidecar **propaga**
+os cabeçalhos de trace, mas quem os repassa de uma chamada de entrada para uma
+chamada de saída é a **aplicação**. Se um serviço não repassar os cabeçalhos, o
+trace quebra ali e você vê dois traces desconexos em vez de um.
+
+O bookinfo repassa. Uma aplicação sua pode não repassar — e é a única coisa
+desta trilha inteira que exige tocar em código.
+====
+
+== Exercício 3: o tempo que não é da aplicação
+
+Num trace do bookinfo passando pelo gateway, existem spans que nenhuma
+aplicação produziu: as chamadas que o Envoy faz **fora do processo** para decidir
+a requisição.
+
+Elas voltam na trilha 3, quando o gateway passar a consultar autorização e limite
+de plano. É lá que a pergunta *"quanto a policy custa em latência?"* tem resposta
+medida, e não estimada.
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 24
+----
+
+.Se falhar
+[%collapsible]
+====
+*Nenhum trace aparece?* A amostragem pode estar baixa ou o collector não está
+entregando. Confira se há spans chegando:
+
+[source,role="execute"]
+----
+oc get pods -A | grep -i tempo
+oc get telemetry -A
+----
+====
+
+== O que isso significa
+
+Grafo e trace respondem a perguntas diferentes, e times confundem as duas o tempo
+todo: o grafo é **agregado** — quantos, quão rápido, quantos erros; o trace é
+**um caso** — onde o tempo foi, nesta requisição.
+
+Investigar lentidão pelo agregado é adivinhar. Investigar capacidade pelo trace é
+generalizar de um caso. As duas telas estão no mesmo console, e nenhuma delas
+pediu alteração no código dos seis serviços.
+
+Siga para xref:24-t2-fault-injection.adoc[Módulo 2.5].

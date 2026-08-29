@@ -1,0 +1,153 @@
+= 2.6 Circuit breaker
+:navtitle: 2.6 Circuit breaker
+
+*Tempo: 20 minutos*
+
+Um serviço lento é pior do que um serviço fora. Fora, o chamador falha rápido e
+segue; lento, ele acumula conexões esperando — e quem cai é o chamador.
+
+== Objetivos
+
+* Declarar limites de conexão e detecção de instância defeituosa.
+* Fazer o circuito abrir sob carga, e ver o `503` que ele produz.
+* Explicar por que isso protege o **chamador**, não o chamado.
+
+== Contexto: duas coisas com o mesmo nome
+
+O que se chama de *circuit breaker* no Istio são dois mecanismos na mesma
+`DestinationRule`:
+
+[cols="1,3"]
+|===
+| `connectionPool` | teto de conexões e requisições pendentes. Excedeu, o sidecar recusa **na hora** com `503` em vez de enfileirar.
+| `outlierDetection` | observa erros por instância e **remove** do balanceamento a que está falhando, por um tempo.
+|===
+
+O primeiro protege contra fila; o segundo, contra uma réplica ruim. Times chamam
+os dois de circuit breaker e depois discutem sem saber que estão falando de
+coisas diferentes.
+
+== Exercício 1: declarar o limite
+
+. Aplique um teto deliberadamente baixo no `ratings`, para que ele seja atingido:
++
+[source,role="execute"]
+----
+oc apply -f - <<'YAML'
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: ratings-breaker
+  namespace: bookinfo
+spec:
+  host: ratings
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 1
+      http:
+        http1MaxPendingRequests: 1
+        maxRequestsPerConnection: 1
+    outlierDetection:
+      consecutive5xxErrors: 1
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
+YAML
+----
+
+== Exercício 2: abrir o circuito
+
+. Chame o `ratings` de dentro do Service Mesh, com concorrência acima do teto:
++
+[source,role="execute"]
+----
+P=$(oc get pod -n bookinfo -l app=reviews -o name | head -1)
+oc exec -n bookinfo "$P" -c reviews -- sh -c '
+for i in $(seq 1 20); do
+  curl -s -o /dev/null -w "%{http_code} " http://ratings:9080/ratings/0 &
+done; wait; echo'
+----
+
+. Você deve ver uma mistura de `200` e `503`. Os `503` não vieram do `ratings` —
+  vieram do sidecar do chamador, que recusou em vez de enfileirar.
+
+[NOTE]
+====
+Se todos vierem `200`, aumente a concorrência: o teto é por conexão, e um cliente
+que reaproveita conexão pode não atingi-lo. É por isso que o comando usa
+`maxRequestsPerConnection: 1` — para forçar o cenário no tempo de um exercício.
+====
+
+== Exercício 3: por que isso protege o chamador
+
+. Remova o breaker e repita a carga com o `ratings` **atrasado** em vez de
+  quebrado:
++
+[source,role="execute"]
+----
+oc delete destinationrule ratings-breaker -n bookinfo
+oc apply -f - <<'YAML'
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: ratings-lento
+  namespace: bookinfo
+spec:
+  hosts: [ratings]
+  http:
+    - fault:
+        delay:
+          percentage: {value: 100}
+          fixedDelay: 5s
+      route:
+        - destination: {host: ratings}
+YAML
+----
+
+. Recarregue a página. Ela demora — e o tempo é do `reviews` **esperando**.
+
+. Limpe:
++
+[source,role="execute"]
+----
+oc delete virtualservice ratings-lento -n bookinfo
+----
+
+Sem breaker, a lentidão do chamado vira lentidão do chamador, e a fila sobe até
+alguém cair. É esse o modo de falha que o `connectionPool` corta.
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 26
+----
+
+.Se falhar
+[%collapsible]
+====
+*Nenhum `503` apareceu?* Aumente a concorrência do laço ou baixe
+`http1MaxPendingRequests` para `1`. O objetivo é atingir o teto dentro de um
+exercício, não medir capacidade real.
+
+*Ficou algum objeto para trás?* Limpe os dois de uma vez:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh corrige 26
+----
+====
+
+== O que isso significa
+
+Resiliência costuma ser escrita como biblioteca dentro de cada aplicação — e
+então existe em Java, não existe em Node, e ninguém sabe qual versão está em qual
+serviço. Aqui é uma propriedade do caminho, declarada por destino e válida para
+qualquer chamador, inclusive os que ainda não existem.
+
+E o valor de negócio é o que a maioria das discussões técnicas esquece: o
+circuito aberto **transforma um incidente em degradação**. A página continua
+carregando, sem notas, em vez de a aplicação inteira parar de responder.
+
+Siga para xref:26-t2-canario.adoc[Módulo 2.7].

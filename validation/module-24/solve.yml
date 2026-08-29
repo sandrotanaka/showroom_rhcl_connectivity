@@ -1,0 +1,11 @@
+---
+# 2.4 PULA: aplica a Telemetry da amostra.
+- name: "2.4 — pula (tracing declarado)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Aplicar a Telemetry da amostra"
+      kubernetes.core.k8s:
+        state: present
+        src: "{{ lookup('env','HOME') }}/rhcl/samples/bookinfo/14-mesh-telemetry.yaml"

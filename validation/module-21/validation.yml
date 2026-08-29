@@ -1,0 +1,42 @@
+---
+- name: "2.1 — mTLS STRICT no namespace"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "PeerAuthentication do namespace"
+      kubernetes.core.k8s_info:
+        api_version: security.istio.io/v1
+        kind: PeerAuthentication
+        namespace: bookinfo
+      register: r_pa
+
+    - name: "Sonda de fora do Service Mesh (deve nao completar a conexao)"
+      ansible.builtin.shell: |
+        oc run mtls-probe-check -n default --image=registry.access.redhat.com/ubi9/ubi-minimal \
+          --restart=Never --rm -i --quiet -- curl -s -m 6 -o /dev/null \
+          -w '%{http_code}' http://ratings.bookinfo:9080/ratings/0 2>/dev/null || true
+      args: {executable: /bin/bash}
+      register: r_probe
+      changed_when: false
+      failed_when: false
+
+    - name: "Consolidar"
+      ansible.builtin.set_fact:
+        _strict: "{{ r_pa.resources | default([]) | selectattr('spec.mtls.mode','defined')
+                     | selectattr('spec.mtls.mode','equalto','STRICT') | list | length > 0 }}"
+        _sem_http: "{{ '000' in (r_probe.stdout | default('')) }}"
+
+    - name: "Resultado"
+      ansible.builtin.assert:
+        that: [_strict | bool, _sem_http | bool]
+        success_msg: |
+          OK PeerAuthentication em STRICT
+          OK sonda de fora do Service Mesh nao completou a conexao (nao houve HTTP)
+        fail_msg: |
+          {{ 'OK  ' if _strict else 'FALHOU' }} PeerAuthentication STRICT
+          {{ 'OK  ' if _sem_http else 'FALHOU' }} sonda devolveu: {{ r_probe.stdout | default('nada') }}
+
+          Um 403 aqui significa PERMISSIVE: a conexao completou e quem recusou foi
+          a AuthorizationPolicy -- outra camada, outra correcao.
+            bash ~/workshop/scripts/workshop.sh pula 21

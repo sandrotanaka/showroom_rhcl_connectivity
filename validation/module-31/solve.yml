@@ -1,0 +1,31 @@
+---
+# 3.1 PULA: remove a rota do upstream e publica as duas rotas no prod-web.
+- name: "3.1 — pula (rotas no prod-web)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Descobrir o dominio de apps"
+      kubernetes.core.k8s_info:
+        api_version: config.openshift.io/v1
+        kind: Ingress
+        name: cluster
+      register: r_ing
+
+    - name: "Remover a rota do upstream (conflito em /api/v1/products)"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: gateway.networking.k8s.io/v1
+        kind: HTTPRoute
+        namespace: bookinfo
+        name: bookinfo
+
+    - name: "Aplicar as rotas, substituindo o __DOMAIN__"
+      kubernetes.core.k8s:
+        state: present
+        definition: >-
+          {{ lookup('file', lookup('env','HOME') ~ '/rhcl/samples/bookinfo/rhcl/' ~ item)
+             | regex_replace('__DOMAIN__', r_ing.resources[0].spec.domain) | from_yaml }}
+      loop:
+        - 20-httproute-ui.yaml
+        - 21-httproute-api.yaml

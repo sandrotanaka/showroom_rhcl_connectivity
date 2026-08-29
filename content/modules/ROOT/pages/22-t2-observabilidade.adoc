@@ -1,0 +1,107 @@
+= 2.3 Observabilidade
+:navtitle: 2.3 Observabilidade
+
+*Tempo: 15 minutos*
+
+Operações não consegue responder por que a página está lenta. Nenhum dos seis
+serviços emite métrica de tráfego — e nenhum precisará.
+
+== Objetivos
+
+* Ler o grafo de tráfego da aplicação sem instrumentar código.
+* Identificar a origem das métricas de serviço.
+* Reconhecer o que o grafo mostra e o que ele **não** mostra.
+
+== Exercício 1: gerar tráfego
+
+O grafo só desenha o que aconteceu na janela. Gere carga em segundo plano:
+
+[source,role="execute"]
+----
+URL="https://bookinfo.$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}')/productpage"
+for i in $(seq 1 200); do curl -sk -o /dev/null "$URL"; sleep 0.3; done &
+----
+
+== Exercício 2: o grafo
+
+. Abra o console e vá em *Service Mesh* → *Traffic Graph*, namespace `bookinfo`,
+  janela *Last 5m*:
++
+[source,role="execute"]
+----
+oc whoami --show-console
+----
+
+. Você deve ver:
++
+----
+bookinfo-gateway
+  └─ productpage ─┬─ details
+                  └─ reviews (v1, v2, v3) ─── ratings
+----
+
+. Repare em três coisas:
++
+* o `reviews` aparece com **três versões**, e uma delas com zero por cento do
+  tráfego — declarada, saudável, e sem receber nada;
+* as arestas trazem taxa de erro e latência que ninguém programou;
+* o `details` não chama ninguém — o grafo revela a topologia real, não a
+  desenhada num diagrama que envelheceu.
+
+== Exercício 3: de onde vêm os números
+
+. As métricas são do Envoy, raspadas pelo monitoramento de workload:
++
+[source,role="execute"]
+----
+oc get servicemonitor,podmonitor -A | grep -i istio
+----
+
+. Pergunte direto ao Thanos:
++
+[source,role="execute"]
+----
+TOKEN=$(oc whoami -t)
+THANOS=$(oc get route thanos-querier -n openshift-monitoring -o jsonpath='{.spec.host}')
+curl -sk -H "Authorization: Bearer $TOKEN" "https://${THANOS}/api/v1/query" \
+  --data-urlencode 'query=sum by (destination_service_name) (rate(istio_requests_total[5m]))' \
+  | python3 -m json.tool | grep -A2 destination_service_name
+----
+
+[NOTE]
+====
+Os manifestos da amostra **não** têm a anotação `prometheus.io/scrape` do
+upstream. Aqui quem raspa é o monitoramento de workload por `ServiceMonitor`; a
+anotação seria pista falsa para quem for investigar de onde vêm os números.
+====
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 23
+----
+
+.Se falhar
+[%collapsible]
+====
+*O grafo está vazio?* A coleta leva até um minuto e a janela é de 5 minutos.
+Gere tráfego de novo e espere:
+
+[source,role="execute"]
+----
+URL="https://bookinfo.$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}')/productpage"
+for i in $(seq 1 60); do curl -sk -o /dev/null "$URL"; done; sleep 60
+----
+====
+
+== O que isso significa
+
+Quatro linguagens, seis serviços, zero linha de instrumentação — e existe taxa de
+erro e latência por aresta. Isso é o que se ganha quando a observabilidade é
+propriedade do **caminho** e não de cada aplicação.
+
+O limite, dito com honestidade: o grafo mostra que uma aresta está lenta, não
+*por quê*. Para isso é preciso ver a requisição inteira, e é o próximo módulo.
+
+Siga para xref:23-t2-tracing.adoc[Módulo 2.4].

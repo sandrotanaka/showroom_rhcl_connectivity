@@ -10,9 +10,11 @@ tabs:
   - name: Terminal
     path: /wetty
     port: 443
+  - name: Aplicação
+    url: 'https://bookinfo.${DOMAIN}/productpage'
   - name: OpenShift
     url: 'https://console-openshift-console.${DOMAIN}'
-  - name: Grafana
-    url: 'https://grafana-route-grafana.${DOMAIN}'
   - name: Developer Hub
     url: 'https://developer-hub.${DOMAIN}'
+  - name: Grafana
+    url: 'https://grafana-route-grafana.${DOMAIN}'

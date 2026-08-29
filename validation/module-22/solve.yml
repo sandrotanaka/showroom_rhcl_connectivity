@@ -1,0 +1,11 @@
+---
+# 2.2 PULA: aplica as tres AuthorizationPolicy por identidade.
+- name: "2.2 — pula (autorizacao por identidade)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Aplicar as AuthorizationPolicy da amostra"
+      kubernetes.core.k8s:
+        state: present
+        src: "{{ lookup('env','HOME') }}/rhcl/samples/bookinfo/13-mesh-authorizationpolicy.yaml"

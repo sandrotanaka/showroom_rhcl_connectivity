@@ -1,0 +1,41 @@
+---
+- name: "3.1 — a borda mudou de dono"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "HTTPRoutes do namespace"
+      kubernetes.core.k8s_info:
+        api_version: gateway.networking.k8s.io/v1
+        kind: HTTPRoute
+        namespace: bookinfo
+      register: r_rotas
+
+    - name: "Consolidar"
+      ansible.builtin.set_fact:
+        _nomes: "{{ r_rotas.resources | default([]) | map(attribute='metadata.name') | list }}"
+        _no_prodweb: "{{ r_rotas.resources | default([])
+                         | selectattr('spec.parentRefs','defined')
+                         | selectattr('spec.parentRefs.0.name','equalto','prod-web') | list }}"
+
+    - name: "Consolidar (2)"
+      ansible.builtin.set_fact:
+        _sem_upstream: "{{ 'bookinfo' not in _nomes }}"
+
+    - name: "Resultado"
+      ansible.builtin.assert:
+        that:
+          - _sem_upstream | bool
+          - _no_prodweb | length >= 2
+        success_msg: |
+          OK a rota do upstream saiu (nao ha mais caminho aberto por acidente)
+          OK {{ _no_prodweb | length }} rota(s) no prod-web: {{ _no_prodweb | map(attribute='metadata.name') | join(' ') }}
+        fail_msg: |
+          {{ 'OK  ' if _sem_upstream else 'FALHOU' }} a HTTPRoute 'bookinfo' do upstream saiu
+          {{ 'OK  ' if _no_prodweb | length >= 2 else 'FALHOU' }} rotas no prod-web: {{ _no_prodweb | length }}
+
+          A rota do upstream ja casa /api/v1/products -- com ela no ar, esse
+          caminho passa SEM chave enquanto o resto passa com chave:
+            oc delete httproute bookinfo -n bookinfo
+          Depois aplique as rotas novas (elas trazem __DOMAIN__):
+            bash ~/workshop/scripts/workshop.sh pula 31

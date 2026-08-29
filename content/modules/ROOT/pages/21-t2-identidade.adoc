@@ -1,0 +1,127 @@
+= 2.2 Autorização por identidade
+:navtitle: 2.2 Identidade
+
+*Tempo: 18 minutos*
+
+Todo mundo fala criptografado. Isso não diz **quem pode falar com quem**.
+
+== Objetivos
+
+* Demonstrar que a autorização compara identidade, não rede.
+* Transformar em declaração o que hoje é verdade por acidente.
+* Explicar a diferença entre um `403` do sidecar e um `403` da aplicação.
+
+== Contexto: verdade por acidente
+
+Hoje, só o `productpage` chama `details` e `reviews`, e só o `reviews` chama
+`ratings`. Isso é verdade porque **é o que o código faz** — não porque alguém
+decidiu. Um serviço novo no namespace, ou uma alteração de código, muda essa
+verdade sem que ninguém precise aprovar nada.
+
+== Exercício 1: o vizinho que não devia entrar
+
+. Chame o `ratings` de dentro do próprio namespace, com uma ServiceAccount
+  qualquer:
++
+[source,role="execute"]
+----
+oc run curl-teste -n bookinfo --image=registry.access.redhat.com/ubi9/ubi-minimal \
+  --restart=Never -it --rm -- curl -s http://ratings:9080/ratings/0
+----
+
+. Você deve ver:
++
+----
+RBAC: access denied
+----
+
+Mesmo namespace. Mesma rede. Conexão criptografada e completada. E ainda assim
+recusado — porque a `ServiceAccount` está errada.
+
+[IMPORTANT]
+====
+Compare com o módulo anterior: lá a conexão **não completou** (`exit=56`), aqui
+ela completou e a requisição foi **negada** (`RBAC: access denied`). Duas camadas,
+dois sintomas, duas correções.
+====
+
+== Exercício 2: quem decide
+
+. Veja as três regras:
++
+[source,role="execute"]
+----
+cat ~/rhcl/samples/bookinfo/13-mesh-authorizationpolicy.yaml
+----
+
+Cada uma nomeia um **principal** SPIFFE:
+
+----
+cluster.local/ns/bookinfo/sa/bookinfo-productpage
+----
+
+Não é IP, não é cabeçalho, não é token da aplicação. É a identidade que o mTLS do
+módulo anterior **provou** — e por isso este módulo depende daquele.
+
+. Confirme que o caminho legítimo continua funcionando:
++
+[source,role="execute"]
+----
+P=$(oc get pod -n bookinfo -l app=reviews -o name | head -1)
+oc exec -n bookinfo "$P" -c reviews -- \
+  curl -s -o /dev/null -w 'reviews -> ratings: %{http_code}\n' http://ratings:9080/ratings/0
+----
+
+== Exercício 3: onde isso é recusado
+
+O `403` não veio do processo do `ratings`. Prove:
+
+[source,role="execute"]
+----
+oc logs -n bookinfo -l app=ratings -c ratings --tail=20
+----
+
+Nenhuma linha sobre a requisição negada. O sidecar recusou antes; a aplicação
+nunca foi acordada. É a mesma propriedade do gateway na trilha 3, aplicada aqui
+dentro.
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 22
+----
+
+.Se falhar
+[%collapsible]
+====
+*O `curl-teste` respondeu com as notas em vez de `RBAC: access denied`?* As
+`AuthorizationPolicy` não estão aplicadas:
+
+[source,role="execute"]
+----
+oc get authorizationpolicy -n bookinfo
+bash ~/workshop/scripts/workshop.sh pula 22
+----
+
+*O pod `curl-teste` ficou preso?* Ele é `--rm` e interativo; se você saiu com
+`Ctrl-C`, pode ter ficado. Remova:
+
+[source,role="execute"]
+----
+oc delete pod curl-teste -n bookinfo --ignore-not-found
+----
+====
+
+== O que isso significa
+
+O que era verdade por acidente virou verdade por declaração. A diferença
+aparece quando algo muda: um serviço novo no namespace **não** herda acesso, e
+uma alteração de código não amplia o alcance de ninguém sem que alguém edite uma
+policy — que é revisável, versionada e auditável.
+
+E note o que a regra **não** faz: ela não protege contra o `productpage`
+comprometido. Segurança leste-oeste limita o alcance de um comprometimento; não o
+impede. Vale dizer isso em voz alta quando alguém chamar isto de "zero trust".
+
+Siga para xref:22-t2-observabilidade.adoc[Módulo 2.3].

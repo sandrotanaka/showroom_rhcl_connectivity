@@ -1,0 +1,44 @@
+---
+- name: "1.1 — a aplicacao subiu pelo GitOps"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Tarefa 1 — os seis pods estao Running com sidecar (2/2)
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: bookinfo
+        field_selectors: [status.phase=Running]
+      register: r_pods
+
+    - name: Tarefa 2 — o ApplicationSet governa as amostras
+      kubernetes.core.k8s_info:
+        api_version: argoproj.io/v1alpha1
+        kind: ApplicationSet
+        namespace: openshift-gitops
+      register: r_appset
+      ignore_errors: true
+
+    - name: Consolidar
+      ansible.builtin.set_fact:
+        _com_sidecar: "{{ r_pods.resources | default([])
+                          | selectattr('spec.containers','defined')
+                          | selectattr('spec.containers','length_is',2) | list }}"
+
+    - name: Resultado
+      ansible.builtin.assert:
+        that:
+          - _com_sidecar | length >= 6
+          - r_appset.resources | default([]) | length > 0
+        success_msg: |
+          OK {{ _com_sidecar | length }} pods com sidecar injetado (2/2)
+          OK ApplicationSet presente — quem aplica daqui em diante e o Argo
+        fail_msg: |
+          {{ 'OK  ' if _com_sidecar | length >= 6 else 'FALHOU' }} pods 2/2 encontrados: {{ _com_sidecar | length }}
+          {{ 'OK  ' if r_appset.resources | default([]) | length > 0 else 'FALHOU' }} ApplicationSet em openshift-gitops
+
+          Suba a amostra:
+            cd ~/rhcl && SAMPLES=bookinfo bash scripts/provision.sh samples
+          Pods 1/2 significam sidecar nao injetado -- confira o label do namespace:
+            oc get ns bookinfo --show-labels

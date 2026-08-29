@@ -1,0 +1,44 @@
+---
+- name: "2.7 — canario declarado entre tres versoes"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "As tres versoes de reviews estao no ar"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: bookinfo
+        label_selectors: [app=reviews]
+        field_selectors: [status.phase=Running]
+      register: r_pods
+
+    - name: "A VirtualService de reviews"
+      kubernetes.core.k8s_info:
+        api_version: networking.istio.io/v1
+        kind: VirtualService
+        name: reviews
+        namespace: bookinfo
+      register: r_vs
+
+    - name: "Consolidar"
+      ansible.builtin.set_fact:
+        _versoes: "{{ r_pods.resources | default([]) | map(attribute='metadata.labels.version')
+                      | select('defined') | unique | list }}"
+        _pesos: "{{ r_vs.resources[0].spec.http[0].route | default([]) | map(attribute='weight') | list }}"
+
+    - name: "Resultado"
+      ansible.builtin.assert:
+        that:
+          - _versoes | length == 3
+          - _pesos | length >= 2
+          - (_pesos | sum) == 100
+        success_msg: |
+          OK tres versoes de reviews no ar: {{ _versoes | sort | join(' ') }}
+          OK pesos declarados na VirtualService: {{ _pesos | join('/') }}
+        fail_msg: |
+          {{ 'OK  ' if _versoes | length == 3 else 'FALHOU' }} versoes no ar: {{ _versoes | join(' ') }}
+          {{ 'OK  ' if _pesos | length >= 2 else 'FALHOU' }} pesos: {{ _pesos | join('/') | default('nenhum') }}
+
+          Restaure o canario da amostra:
+            oc apply -f ~/rhcl/samples/bookinfo/12-mesh-virtualservice-reviews.yaml

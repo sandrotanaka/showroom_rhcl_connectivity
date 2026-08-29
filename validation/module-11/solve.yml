@@ -1,0 +1,26 @@
+---
+# 1.1 PULA: sobe a amostra sem passar pelo portal nem pelo GitLab.
+- name: "1.1 — pula (estado final: bookinfo no ar)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Aplicar a amostra pelo provisionador (ele substitui o __DOMAIN__)
+      ansible.builtin.command:
+        cmd: bash scripts/provision.sh samples
+        chdir: "{{ lookup('env','HOME') }}/rhcl"
+      environment:
+        SAMPLES: bookinfo
+      register: r_prov
+      changed_when: true
+
+    - name: Esperar os pods
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: bookinfo
+        field_selectors: [status.phase=Running]
+      register: r_pods
+      until: r_pods.resources | length >= 6
+      retries: 30
+      delay: 10

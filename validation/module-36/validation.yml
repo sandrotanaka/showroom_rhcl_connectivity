@@ -1,0 +1,54 @@
+---
+- name: "3.6 — o servico novo nasceu com as tres camadas"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "AuthPolicy fora dos namespaces do workshop"
+      kubernetes.core.k8s_info:
+        api_version: kuadrant.io/v1
+        kind: AuthPolicy
+      register: r_auth
+
+    - name: "PeerAuthentication fora dos namespaces do workshop"
+      kubernetes.core.k8s_info:
+        api_version: security.istio.io/v1
+        kind: PeerAuthentication
+      register: r_pa
+
+    - name: "Applications no Argo"
+      kubernetes.core.k8s_info:
+        api_version: argoproj.io/v1alpha1
+        kind: Application
+        namespace: openshift-gitops
+      register: r_apps
+      ignore_errors: true
+
+    - name: "Consolidar"
+      ansible.builtin.set_fact:
+        _conhecidos: [bookinfo, travel-agency, echo-api, ingress-gateway]
+    - name: "Consolidar (2)"
+      ansible.builtin.set_fact:
+        _ns_novos: "{{ r_auth.resources | default([]) | map(attribute='metadata.namespace') | unique | list | difference(_conhecidos) }}"
+        _ns_mesh: "{{ r_pa.resources | default([]) | map(attribute='metadata.namespace') | unique | list | difference(_conhecidos) }}"
+        _synced: "{{ r_apps.resources | default([]) | selectattr('status.sync.status','defined')
+                     | selectattr('status.sync.status','equalto','Synced') | list }}"
+
+    - name: "Resultado"
+      ansible.builtin.assert:
+        that:
+          - _ns_novos | length > 0
+          - _ns_mesh | length > 0
+          - _synced | length > 0
+        success_msg: |
+          OK API nova com policy de borda em: {{ _ns_novos | join(' ') }}
+          OK e ja no Service Mesh (mTLS declarado) em: {{ _ns_mesh | join(' ') }}
+          OK {{ _synced | length }} Application(s) sincronizada(s) pelo Argo
+        fail_msg: |
+          {{ 'OK  ' if _ns_novos | length > 0 else 'FALHOU' }} namespace novo com AuthPolicy
+          {{ 'OK  ' if _ns_mesh | length > 0 else 'FALHOU' }} namespace novo com PeerAuthentication
+          {{ 'OK  ' if _synced | length > 0 else 'FALHOU' }} alguma Application Synced
+
+          Sem o OpenShift GitOps o template abre o PR e gera os manifests, mas
+          nada sincroniza sozinho:
+            oc get applicationset -n openshift-gitops

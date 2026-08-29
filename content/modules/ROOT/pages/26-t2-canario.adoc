@@ -1,0 +1,124 @@
+= 2.7 Canário
+:navtitle: 2.7 Canário
+
+*Tempo: 18 minutos*
+
+No módulo 1.1 você recarregou a página e viu as estrelas mudarem: **90% sem
+estrelas, 10% com estrelas vermelhas, nunca pretas**. Agora dá para explicar por
+quê — e a explicação não é a que a maioria chuta.
+
+== Objetivos
+
+* Distinguir canário de troca de versão.
+* Mover tráfego entre versões sem alterar réplicas nem imagens.
+* Explicar por que uma versão saudável pode receber zero por cento.
+
+== Exercício 1: as três versões
+
+. As três estão no ar, saudáveis:
++
+[source,role="execute"]
+----
+oc get pods -n bookinfo -l app=reviews -L version
+----
+
+* *v1* — sem estrelas
+* *v2* — estrelas pretas
+* *v3* — estrelas vermelhas
+
+. A v2 está `Running`, pronta, com endpoints. E não recebe **nada**.
+
+== Exercício 2: quem decide
+
+. O balanceamento do Kubernetes distribuiria por pod — três versões, ~33% cada.
+  Não é o que acontece:
++
+[source,role="execute"]
+----
+cat ~/rhcl/samples/bookinfo/12-mesh-virtualservice-reviews.yaml
+----
+
+. E os *subsets* que a `VirtualService` referencia:
++
+[source,role="execute"]
+----
+oc get destinationrule reviews -n bookinfo -o jsonpath='{.spec.subsets}' | python3 -m json.tool
+----
+
+[IMPORTANT]
+====
+É aqui que canário se separa de troca de versão, e a frase precisa de **três**
+versões para ser dita:
+
+*Quem decide a versão é a `VirtualService`, não o deploy.*
+
+Com duas versões, "mover o tráfego" e "trocar a versão" parecem a mesma coisa.
+Com três — uma servindo 90%, outra 10% e uma terceira saudável em zero — fica
+óbvio que estar no ar e receber tráfego são decisões **separadas**.
+====
+
+== Exercício 3: mover o tráfego
+
+. Meça a distribuição atual, em 20 chamadas:
++
+[source,role="execute"]
+----
+URL="https://bookinfo.$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}')/productpage"
+for i in $(seq 1 20); do curl -sk "$URL" | grep -o 'glyphicon-star' | head -1; done | wc -l
+----
+
+. Promova a v2 para metade do tráfego:
++
+[source,role="execute"]
+----
+oc patch virtualservice reviews -n bookinfo --type=json \
+  -p '[{"op":"replace","path":"/spec/http/0/route/0/weight","value":50},
+       {"op":"replace","path":"/spec/http/0/route/1/weight","value":50}]'
+----
+
+. Recarregue a página várias vezes. As estrelas **pretas** passam a aparecer.
+
+. Devolva ao estado original:
++
+[source,role="execute"]
+----
+oc apply -f ~/rhcl/samples/bookinfo/12-mesh-virtualservice-reviews.yaml
+----
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 27
+----
+
+.Se falhar
+[%collapsible]
+====
+*As estrelas não mudaram depois do patch?* O navegador pode estar servindo
+cache. Recarregue com `Ctrl-Shift-R`, ou meça pelo terminal, que não tem cache.
+
+*O patch falhou com erro de caminho?* A ordem das rotas na `VirtualService`
+importa: o índice `0` é a v1 e o `1` é a v3. Confira antes de corrigir:
+
+[source,role="execute"]
+----
+oc get virtualservice reviews -n bookinfo -o jsonpath='{.spec.http[0].route}' | python3 -m json.tool
+----
+====
+
+== O que isso significa
+
+Nenhuma imagem foi trocada, nenhuma réplica foi escalada, nenhum deploy
+aconteceu. O que mudou foi um peso — e a versão que os usuários veem mudou junto.
+
+Isso separa duas decisões que costumam vir grudadas: **entregar** (a versão está
+no cluster, saudável, verificável) e **liberar** (a versão recebe usuários). Com
+elas separadas, um *rollback* deixa de ser um novo deploy e passa a ser a edição
+de um número — em segundos, sem esperar build.
+
+Com isso a trilha 2 fecha: identidade, observabilidade, tracing, falha,
+resiliência e versão — seis propriedades que a aplicação não tem, e que ela
+recebeu por estar no caminho.
+
+Siga para xref:30-t3-a-borda.adoc[Trilha 3, módulo 1].

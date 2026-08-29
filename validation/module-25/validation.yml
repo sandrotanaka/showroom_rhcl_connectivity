@@ -1,0 +1,47 @@
+---
+# 2.5 -- fault injection. O modulo INJETA e REVERTE; o estado correto ao final
+# e "sem VirtualService de falha".
+- name: "2.5 — a injecao de falha foi exercitada e revertida"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "VirtualService no namespace"
+      kubernetes.core.k8s_info:
+        api_version: networking.istio.io/v1
+        kind: VirtualService
+        namespace: bookinfo
+      register: r_vs
+
+    - name: "A aplicacao responde pela borda"
+      ansible.builtin.shell: |
+        set -o pipefail
+        D=$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}')
+        curl -sk -m 10 -o /dev/null -w '%{http_code}' "https://bookinfo.${D}/productpage"
+      args: {executable: /bin/bash}
+      register: r_ui
+      changed_when: false
+      failed_when: false
+
+    - name: "Consolidar"
+      ansible.builtin.set_fact:
+        _com_falha: "{{ r_vs.resources | default([])
+                        | selectattr('spec.http','defined')
+                        | map(attribute='spec.http') | map('first')
+                        | selectattr('fault','defined') | list }}"
+        _ui_ok: "{{ (r_ui.stdout | default('') | trim) in ['200','401'] }}"
+
+    - name: "Resultado"
+      ansible.builtin.assert:
+        that:
+          - _com_falha | length == 0
+          - _ui_ok | bool
+        success_msg: |
+          OK nenhuma injecao de falha ativa (o exercicio foi revertido)
+          OK a aplicacao responde pela borda ({{ r_ui.stdout | trim }})
+        fail_msg: |
+          {{ 'OK  ' if _com_falha | length == 0 else 'FALHOU' }} injecoes de falha ativas: {{ _com_falha | length }}
+          {{ 'OK  ' if _ui_ok else 'FALHOU' }} resposta da borda: {{ r_ui.stdout | default('nada') }}
+
+          Reverta o exercicio:
+            bash ~/workshop/scripts/workshop.sh corrige 25

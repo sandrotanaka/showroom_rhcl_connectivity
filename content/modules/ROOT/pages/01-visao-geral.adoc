@@ -3,67 +3,65 @@
 
 == O cenário
 
-A *Travel Agency* é uma empresa de viagens com uma API pública, `/travels`, que
-agrega quatro fornecedores — voos, hotéis, carros e seguros — e aplica descontos.
-A API funciona há anos. Ninguém quer mexer nela.
+A *Bookstore ACME* tem uma aplicação de catálogo em produção há anos: seis
+microserviços, quatro linguagens, e uma página que mostra livro, detalhes e
+resenhas. Ela funciona. Ninguém quer mexer no código dela.
 
-O que mudou foi o negócio: a diretoria comercial decidiu vender acesso à API em
-três planos — `free`, `silver` e `gold` — com cotas diferentes e um contrato por
-trás de cada uma. E quer saber, no fim do mês, quanto cada plano consumiu.
+O que mudou foi tudo em volta:
 
-Sua tarefa é entregar isso **sem abrir um ticket para o time da aplicação**.
+. *Auditoria* perguntou de onde vêm as imagens que rodam em produção — e a
+  resposta hoje é "do registry público de terceiro, sem varredura e sem
+  assinatura".
+. *Operações* não consegue responder por que uma página fica lenta, nem isolar
+  um serviço que começou a falhar.
+. *Comercial* decidiu vender acesso ao catálogo por API, em três planos.
 
-== O que está no cluster antes de você começar
+Três perguntas, três trilhas. Nenhuma delas se resolve alterando os seis
+serviços.
 
-Nada disso você precisa instalar; já está lá:
+== O que já está no cluster
+
+Você não instala nada disso:
 
 [cols="1,3"]
 |===
 | *OpenShift Service Mesh 3* | Istio, com o gateway `prod-web` na borda
-| *Red Hat Connectivity Link 1.4* | o Kuadrant, que traz as policies que você vai usar
-| *Travel Agency* | seis serviços rodando em `travel-agency` e `travel-db`
-| *Observabilidade* | Prometheus de workload, Thanos, Grafana e Tempo
-| *Red Hat Developer Hub* | o portal, com o catálogo e o golden path (Módulo 6)
+| *Red Hat Connectivity Link* | as policies de API — chave, plano, limite, telemetria
+| *OpenShift Pipelines* + *Tekton Chains* | a cadeia, e quem assina o que ela produz
+| *RHTAS* (Rekor) e *RHACS* | transparência de assinatura e varredura de imagem
+| *Quay*, *GitLab*, *SonarQube*, *Nexus* | registry, repositório, portão de qualidade e artefatos
+| *Red Hat Developer Hub* | o portal: catálogo, abas de CI e Kubernetes, golden path
+| *Observabilidade* | Prometheus de workload, Thanos, Grafana, Tempo e Kiali
 |===
 
-== As cinco policies, na ordem em que você vai encontrá-las
+== O fio que atravessa o dia
 
-O Connectivity Link não é uma configuração só. São objetos Kubernetes distintos,
-cada um respondendo a uma pergunta diferente — e essa separação é o assunto do
-workshop inteiro:
+Cada trilha responde a uma pergunta diferente sobre **o mesmo** conjunto de seis
+pods:
 
 [cols="1,2,3"]
 |===
-| Objeto | Pergunta que responde | Módulo
+| Trilha | Pergunta | O objeto que responde
 
-| `AuthPolicy` | quem entra? | 1
-| `PlanPolicy` | quanto passa, por plano? | 2
-| `RateLimitPolicy` | quanto passa, no total? | 3
-| `TelemetryPolicy` | o que isso vira em métrica? | 4
-| `PeerAuthentication` + `AuthorizationPolicy` | quem fala com quem, lá dentro? | 7
+| 1 | de onde isto veio, e quem garante? | `Pipeline`, `Rekor`, ACS, `Application`
+| 2 | quem fala com quem aqui dentro, e o que acontece quando quebra? | `PeerAuthentication`, `AuthorizationPolicy`, `VirtualService`, `DestinationRule`
+| 3 | quem entra, quanto pode, e quanto isso vale? | `HTTPRoute`, `AuthPolicy`, `PlanPolicy`, `TelemetryPolicy`
 |===
 
 [IMPORTANT]
 ====
-Repare no que *não* está nessa lista: nenhum arquivo da aplicação. Ao final do
-workshop, o `git log` do repositório da Travel Agency estará idêntico ao do
-começo.
+Repare no que não aparece em nenhuma coluna: código da aplicação. Ao final do
+dia, as imagens dos seis serviços serão as mesmas — só a **origem** de onde elas
+vêm terá mudado, e isso é assunto da trilha 1.
 ====
 
-== Como cada módulo funciona
+== Um aviso sobre o que você vai ver falhar
 
-Todos seguem a mesma forma:
-
-*Contexto* — por que este passo existe e a que pergunta ele responde. +
-*Exercício* — comandos que você executa, com o resultado esperado ao lado. +
-*Verificação* — um comando que confirma que funcionou, e diz o que corrigir se não. +
-*O que isso significa* — a leitura de plataforma, que é o que você leva embora.
-
-[TIP]
-====
-Os blocos de comando têm um botão de execução: clicar manda o comando para o
-terminal ao lado. Você também pode digitar — em alguns módulos, digitar é melhor,
-e o texto avisa quando for o caso.
-====
+Três exercícios do dia produzem erro de propósito: uma sonda que não completa a
+conexão, um serviço que recusa outro do mesmo namespace, e um circuito que abre.
+Nos três casos o guia diz **antes** o que deve aparecer. Quando o resultado for
+diferente do previsto, o bloco *"se falhar"* de cada módulo tem o diagnóstico —
+e vale lê-lo em vez de improvisar, porque erros parecidos aqui têm causas
+opostas.
 
 Siga para xref:02-ambiente.adoc[Seu ambiente].
