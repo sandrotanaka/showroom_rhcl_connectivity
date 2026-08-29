@@ -1,0 +1,55 @@
+---
+# Modulo 7 -- A borda nao e a unica fronteira
+- name: "Modulo 7 — fronteira leste-oeste"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Tarefa 1 — mTLS em STRICT
+      kubernetes.core.k8s_info:
+        api_version: security.istio.io/v1
+        kind: PeerAuthentication
+        name: travel-agency-mtls
+        namespace: travel-agency
+      register: r_pa
+
+    - name: Tarefa 2 — a AuthorizationPolicy do discounts existe
+      kubernetes.core.k8s_info:
+        api_version: security.istio.io/v1
+        kind: AuthorizationPolicy
+        namespace: travel-agency
+      register: r_ap
+
+    - name: Tarefa 3 — o travels NAO entra no discounts (403 pelo sidecar)
+      ansible.builtin.shell: |
+        set -o pipefail
+        P=$(oc get pod -n travel-agency -l app=travels -o name | head -1)
+        oc exec -n travel-agency "$P" -c travels -- \
+          curl -s -m 4 -o /dev/null -w '%{http_code}' \
+          http://discounts.travel-agency:8000/discounts/travels
+      args: {executable: /bin/bash}
+      register: r_probe
+      changed_when: false
+      failed_when: false
+
+    - name: Consolidar
+      ansible.builtin.set_fact:
+        _t1: "{{ (r_pa.resources | default([]) | length > 0) and
+                 (r_pa.resources[0].spec.mtls.mode | default('')) == 'STRICT' }}"
+        _t2: "{{ r_ap.resources | default([]) | length > 0 }}"
+        _t3: "{{ r_probe.stdout | trim == '403' }}"
+
+    - name: Resultado
+      ansible.builtin.assert:
+        that: [_t1 | bool, _t2 | bool, _t3 | bool]
+        success_msg: |
+          OK Tarefa 1: PeerAuthentication STRICT
+          OK Tarefa 2: AuthorizationPolicy presente em travel-agency
+          OK Tarefa 3: travels recusado com 403 -- a chave de API nao abre o cofre
+        fail_msg: |
+          {{ 'OK  ' if _t1 else 'FALHOU' }} Tarefa 1: mTLS STRICT (modo atual: {{ r_pa.resources[0].spec.mtls.mode | default('ausente') }})
+          {{ 'OK  ' if _t2 else 'FALHOU' }} Tarefa 2: AuthorizationPolicy em travel-agency
+          {{ 'OK  ' if _t3 else 'FALHOU' }} Tarefa 3: travels -> discounts devia dar 403 (recebido: {{ r_probe.stdout | default('nada') }})
+
+          Corrija:
+            oc apply -k overlays/rhcl-1.4

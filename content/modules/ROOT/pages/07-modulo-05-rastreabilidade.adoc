@@ -1,0 +1,104 @@
+= Módulo 5 — O caminho todo é rastreável
+:navtitle: Módulo 5 — Rastreabilidade
+
+*Tempo: 10 minutos*
+
+A decisão de policy acontece na borda, fora da aplicação. A objeção óbvia é:
+*isso não vira uma caixa-preta no meio do caminho?*
+
+== Objetivos
+
+* Ver a requisição inteira, da borda ao banco, num único grafo.
+* Encontrar no trace as duas chamadas que a policy adiciona, com seus tempos.
+* Responder com número à pergunta "quanto custa em latência?".
+
+== Exercício 1: desenhar o grafo
+
+. Gere tráfego que atravessa toda a cadeia, em segundo plano:
++
+[source,role="execute"]
+----
+DURATION=240 bash scripts/traffic.sh mesh &
+----
+
+[IMPORTANT]
+====
+Este modo de tráfego não é decoração. Uma requisição simples a `/travels` é
+respondida **localmente** pelo serviço `travels` e o grafo para em
+`prod-web → travels` — o que na tela se lê como coleta quebrada. Quem provoca o
+fan-out é `/travels/<cidade>` **com o header `user`**; sem ele, os quatro
+vendedores não chamam o `discounts` e o grafo perde o nível mais profundo.
+
+O modo `mesh` faz as duas coisas certas, e usa só a chave `gold` — um `429` é
+recusado na borda e nunca entra no Service Mesh.
+====
+
+. A coleta leva cerca de um minuto. Enquanto espera, abra o console:
++
+[source,role="execute"]
+----
+oc whoami --show-console
+----
+
+. Vá em *Service Mesh* → *Traffic Graph*, selecione os namespaces
+  `ingress-gateway`, `travel-agency` e `travel-db`, janela *Last 5m*. Você deve
+  ver:
++
+----
+prod-web (ingress-gateway)
+  └─ travels ─┬─ flights ────┬─ discounts (v1, v2)
+              ├─ hotels ─────┤
+              ├─ cars ───────┤
+              └─ insurances ─┴─ mysqldb (travel-db)
+----
+
+== Exercício 2: o custo da policy, em milissegundos
+
+. No console, vá em *Observe* → *Traces*, instância `tempo`, serviço
+  `prod-web-istio.ingress-gateway`.
+
+. Abra um trace. Você verá, no mesmo *timeline*, a decisão do gateway e a chamada
+  de aplicação — e, dentro da decisão, **duas chamadas gRPC fora do processo**:
+  autorização e rate limit.
+
+Essas duas chamadas são a resposta numérica para *"quanto a policy custa?"*. Elas
+têm timeout de 200 ms e 100 ms respectivamente, e aparecem medidas, não
+estimadas.
+
+== Verificação
+
+[source,role="execute"]
+----
+ansible-playbook ~/workshop/validation/module-05/validation.yml
+----
+
+.Se falhar
+[%collapsible]
+====
+*O grafo para em `prod-web → travels`?* O tráfego não tinha o header `user` ou
+não usava `/travels/<cidade>`. Rode o modo correto e espere a coleta:
+
+[source,role="execute"]
+----
+DURATION=120 bash scripts/traffic.sh mesh
+----
+
+*Nenhum trace aparece?* Confirme que o collector está entregando ao Tempo:
+
+[source,role="execute"]
+----
+oc get pods -n openshift-tempo-operator,tempo 2>/dev/null | head
+----
+====
+
+== O que isso significa
+
+Esta é a terceira tela do console no mesmo workshop: Policy Topology no Módulo 3,
+Traffic Graph e Traces agora. **Nenhuma ferramenta nova entrou na conversa** — e
+nenhuma delas é específica do Connectivity Link.
+
+Amarrando ao Módulo 3: a policy não é opaca na borda. Ela é observável no mesmo
+lugar que o resto do tráfego, com as mesmas ferramentas que a equipe de operação
+já usa.
+
+Siga para xref:08-modulo-06-golden-path.adoc[Módulo 6].

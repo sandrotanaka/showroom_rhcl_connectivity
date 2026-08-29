@@ -1,0 +1,132 @@
+= Módulo 4 — Isso vira número de negócio
+:navtitle: Módulo 4 — Métrica de negócio
+
+*Tempo: 14 minutos*
+
+Até aqui você mediu comportamento na linha de comando. A diretoria não abre
+terminal. A pergunta agora é: **o plano comercial aparece no painel?**
+
+== Objetivos
+
+* Consultar as métricas de autorização e limite quebradas por plano.
+* Identificar qual policy adiciona a dimensão de negócio à métrica.
+* Ler no Grafana a diferença entre rajada e cota contratual.
+
+== Exercício 1: a métrica por plano
+
+. Gere tráfego identificado e consulte o resultado:
++
+[source,role="execute"]
+----
+bash scripts/traffic.sh metrics
+----
+
+. Você deve ver algo assim:
++
+----
+servidas por plano
+  authorized_calls{plan="gold",...}  2
+  authorized_calls{plan="free",...}  3
+
+limitadas (429) por plano
+  limited_calls{plan="free",...}     5
+
+cota diaria restante
+  gold     99998/100000
+  free     997/1000
+----
+
+. Pergunte o mesmo diretamente ao Thanos, para ver que não há mágica no script:
++
+[source,role="execute"]
+----
+TOKEN=$(oc whoami -t)
+THANOS=$(oc get route thanos-querier -n openshift-monitoring -o jsonpath='{.spec.host}')
+curl -sk -H "Authorization: Bearer $TOKEN" "https://${THANOS}/api/v1/query" \
+  --data-urlencode 'query=sum by (plan) (authorized_calls)' | python3 -m json.tool
+----
+
+== Exercício 2: de onde vem o label `plan`
+
+O label `plan` **não vem do Limitador**. Sem ele, a métrica responde *"quantos
+429 houve"*. Com ele, responde *"o plano free está saturando"* — que é a pergunta
+que a área comercial faz.
+
+. Veja quem o adiciona:
++
+[source,role="execute"]
+----
+cat base/policies-telemetry/prod-web-telemetry.yaml
+----
+
+. A cadeia inteira, do plano ao painel:
++
+----
+PlanPolicy → TelemetryPolicy → Limitador → Prometheus (user workload) → Thanos → Grafana
+----
++
+Nada dessa cadeia foi montado para o workshop, exceto o `TelemetryPolicy`. O
+resto já era a observabilidade do cluster. A demo só acrescentou a **dimensão de
+negócio**.
+
+== Exercício 3: o painel
+
+. Abra o Grafana e o dashboard *Planos comerciais*:
++
+[source,role="execute"]
+----
+echo "https://$(oc get route -n openshift-monitoring grafana -o jsonpath='{.spec.host}' 2>/dev/null || oc get route -A -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].spec.host}')/d/rhcl-negocio-planos"
+----
+
+. Os quatro primeiros painéis são a rajada que você acabou de gerar. O quinto é a
+  **cota diária consumida por plano**.
+
+A diferença entre eles é a diferença entre operação e contrato: a rajada é o que
+a plateia vê acontecer; a cota é o que está assinado.
+
+[WARNING]
+====
+Os dashboards de fábrica do Connectivity Link **agregam sem quebrar por
+`plan`** — eles são anteriores ao `TelemetryPolicy`. Não procure plano comercial
+neles; procure no dashboard `rhcl-negocio-planos`.
+====
+
+== Verificação
+
+[source,role="execute"]
+----
+ansible-playbook ~/workshop/validation/module-04/validation.yml
+----
+
+.Se falhar
+[%collapsible]
+====
+*O Thanos não devolve nenhuma série?* A coleta leva até um minuto. Gere tráfego
+e espere:
+
+[source,role="execute"]
+----
+bash scripts/traffic.sh tiers && sleep 60
+----
+
+*As séries existem mas não têm o label `plan`?* O `TelemetryPolicy` não está
+`Enforced`:
+
+[source,role="execute"]
+----
+oc get telemetrypolicy prod-web-telemetry -n ingress-gateway \
+  -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\n"}{end}'
+----
+====
+
+== O que isso significa
+
+Uma plataforma de API que não produz número de negócio obriga alguém a construir
+o relatório por fora — normalmente exportando log e cruzando planilha. Aqui a
+dimensão comercial entra na métrica **na borda**, no mesmo lugar onde a decisão
+foi tomada, e por uma policy declarativa.
+
+O efeito prático: a mesma consulta que o SRE usa para ver saturação, o comercial
+usa para ver consumo por contrato. Uma fonte, duas leituras.
+
+Siga para xref:07-modulo-05-rastreabilidade.adoc[Módulo 5].

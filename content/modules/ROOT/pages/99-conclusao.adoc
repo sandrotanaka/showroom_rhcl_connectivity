@@ -1,0 +1,76 @@
+= Conclusão
+:navtitle: Conclusão
+
+*Tempo: 6 minutos*
+
+== O que você fez
+
+Em duas horas, uma API que já existia virou um produto com três planos, cota por
+contrato, número de negócio no painel e uma fronteira interna que a chave de API
+não abre.
+
+[cols="1,3"]
+|===
+| Módulo 1 | A aplicação recusa sem ter código de autenticação
+| Módulo 2 | Vocabulário comercial virou configuração — um label e uma policy
+| Módulo 3 | Quando duas policies se sobrepõem, o status nomeia quem venceu
+| Módulo 4 | A dimensão de negócio entra na métrica na borda, por policy
+| Módulo 5 | A decisão de policy é rastreável com as ferramentas que já existiam
+| Módulo 6 | Um serviço novo não consegue nascer sem policy, plano e fronteira
+| Módulo 7 | A chave de API abre a porta da rua, não o cofre
+|===
+
+== O que você não fez
+
+Não alterou uma linha da aplicação. Confira, se quiser:
+
+[source,role="execute"]
+----
+oc get deploy -n travel-agency -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.template.spec.containers[0].image}{"\n"}{end}'
+----
+
+As mesmas imagens do começo. É isso que separa uma plataforma de API de uma
+biblioteca de autenticação: **a capacidade não foi adicionada ao código, foi
+adicionada ao caminho**.
+
+== A tese, agora que você mediu cada parte
+
+Um gateway responde *"quem entra"*. Uma plataforma de API responde:
+
+* quem entra — `AuthPolicy`;
+* quanto passa, por contrato — `PlanPolicy`;
+* quem vence quando duas regras colidem — o campo de status;
+* quanto isso vale em dinheiro — `TelemetryPolicy`;
+* como o próximo serviço nasce já com tudo isso — o golden path;
+* e onde a fronteira continua, depois da borda — Service Mesh.
+
+Os seis primeiros módulos existem para que o sétimo não seja uma promessa.
+
+== Para levar embora
+
+[cols="1,3"]
+|===
+| Repositório da demo | {repo_url}
+| Este workshop | {workshop_repo_url}
+| Red Hat Connectivity Link | https://developers.redhat.com/products/red-hat-connectivity-link
+| Kuadrant (upstream) | https://docs.kuadrant.io
+| Gateway API | https://gateway-api.sigs.k8s.io
+|===
+
+[IMPORTANT]
+====
+Seu cluster será destruído ao final do workshop. Se quiser guardar algo que criou
+no Módulo 6, o repositório gerado continua no seu Git — o cluster é que é efêmero.
+====
+
+== Próximo passo natural
+
+Rode o workshop de novo, no seu próprio ambiente, contra uma API sua. O
+repositório da demo é idempotente e descobre o cluster sozinho:
+
+[source,role="execute"]
+----
+bash scripts/new-env.sh && bash scripts/provision.sh
+----
+
+Obrigado por participar.

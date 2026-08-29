@@ -1,0 +1,67 @@
+---
+# Modulo 2 -- Nem todo cliente e igual
+- name: "Modulo 2 — planos comerciais"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Tarefa 1 — o PlanPolicy existe e esta Enforced
+      kubernetes.core.k8s_info:
+        api_version: extensions.kuadrant.io/v1alpha1
+        kind: PlanPolicy
+        name: travels-plans
+        namespace: travel-agency
+      register: r_plan
+
+    - name: Tarefa 2 — as chaves de parceiro tem tier
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        namespace: kuadrant-system
+        label_selectors:
+          - app=partner
+      register: r_keys
+
+    - name: Tarefa 3 — o Limitador tem um contador por plano
+      kubernetes.core.k8s_info:
+        api_version: limitador.kuadrant.io/v1alpha1
+        kind: Limitador
+        name: limitador
+        namespace: kuadrant-system
+      register: r_lim
+
+    - name: Consolidar
+      ansible.builtin.set_fact:
+        _t1: "{{ (r_plan.resources | default([]) | length > 0) and
+                 (r_plan.resources[0].status.conditions
+                  | selectattr('type','equalto','Enforced')
+                  | selectattr('status','equalto','True') | list | length > 0) }}"
+        _tiers: "{{ r_keys.resources | default([])
+                    | map(attribute='metadata.labels') | select('defined')
+                    | map(attribute='kuadrant.io/plan-id') | select('defined')
+                    | unique | list }}"
+        _limits: "{{ r_lim.resources[0].spec.limits | default([]) }}"
+
+    - name: Consolidar (2)
+      ansible.builtin.set_fact:
+        _t2: "{{ ['free','silver','gold'] | difference(_tiers) | length == 0 }}"
+        _t3: "{{ _limits | length >= 3 }}"
+
+    - name: Resultado
+      ansible.builtin.assert:
+        that: [_t1 | bool, _t2 | bool, _t3 | bool]
+        success_msg: |
+          OK Tarefa 1: PlanPolicy travels-plans Accepted+Enforced
+          OK Tarefa 2: chaves cobrem os tres planos: {{ _tiers | join(' ') }}
+          OK Tarefa 3: {{ _limits | length }} contadores no Limitador
+        fail_msg: |
+          {{ 'OK  ' if _t1 else 'FALHOU' }} Tarefa 1: PlanPolicy Enforced
+          {{ 'OK  ' if _t2 else 'FALHOU' }} Tarefa 2: tiers encontrados: {{ _tiers | join(' ') | default('nenhum') }}
+          {{ 'OK  ' if _t3 else 'FALHOU' }} Tarefa 3: contadores no Limitador: {{ _limits | length }}
+
+          Corrija:
+            oc apply -k overlays/rhcl-1.4
+            bash scripts/traffic.sh reset
+          Se os tres planos deram resultados identicos, uma RateLimitPolicy plana
+          esta sobrepondo o PlanPolicy -- overlay da release errada:
+            oc get ratelimitpolicy -A

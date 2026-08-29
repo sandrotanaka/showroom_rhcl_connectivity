@@ -1,0 +1,62 @@
+= Red Hat Connectivity Link — do gateway à plataforma de API
+:navtitle: Boas-vindas
+
+Bem-vindo. Nas próximas duas horas você vai pegar uma API que já existe — sem
+tocar em uma linha do código dela — e transformá-la em um **produto** com três
+planos comerciais, cota por contrato, número de negócio no Grafana e uma
+fronteira interna que a chave de API não abre.
+
+Este workshop é autoguiado. Você tem um cluster OpenShift só seu, e cada módulo
+termina com uma verificação que confirma, na sua máquina, que o passo funcionou.
+
+== Para quem é
+
+Duas cadeiras, e o workshop precisa das duas:
+
+[cols="1,3"]
+|===
+| *Engenharia de Plataforma*
+| Onde a policy mora, quem vence quando duas se sobrepõem, e o que a plataforma
+  garante sem pedir nada ao time de aplicação.
+
+| *Desenvolvimento*
+| Como um serviço novo nasce já com policy de borda, plano comercial e fronteira
+  leste-oeste — sem abrir um ticket para a plataforma.
+|===
+
+A tese que os sete módulos defendem é uma só: **o Connectivity Link é uma
+plataforma de API, não um gateway**. O Módulo 6 é onde as duas cadeiras se
+encontram.
+
+== O que você precisa saber antes
+
+* `oc` na linha de comando — `get`, `apply`, `logs`. Nada além disso.
+* Noção de YAML. Você vai ler bastante e editar pouco.
+* Não é necessário conhecer Istio, Envoy, Kuadrant ou Gateway API. O workshop
+  apresenta cada um quando ele aparece.
+
+== Duração
+
+Duas horas, distribuídas assim:
+
+[cols="4,1"]
+|===
+| xref:02-ambiente.adoc[Seu ambiente] — acesso, clone, verificação inicial | 10 min
+| xref:03-modulo-01-api-fechada.adoc[Módulo 1] — a API está fechada por padrão | 10 min
+| xref:04-modulo-02-planos.adoc[Módulo 2] — nem todo cliente é igual | 18 min
+| xref:05-modulo-03-precedencia.adoc[Módulo 3] — precedência é explícita | 14 min
+| xref:06-modulo-04-metricas.adoc[Módulo 4] — isso vira número de negócio | 14 min
+| xref:07-modulo-05-rastreabilidade.adoc[Módulo 5] — o caminho todo é rastreável | 10 min
+| xref:08-modulo-06-golden-path.adoc[Módulo 6] — a policy nasce com o serviço | 24 min
+| xref:09-modulo-07-leste-oeste.adoc[Módulo 7] — a borda não é a única fronteira | 14 min
+| xref:99-conclusao.adoc[Conclusão] e próximos passos | 6 min
+|===
+
+[NOTE]
+====
+Se você ficar sem tempo, o Módulo 7 é o que pode ficar para depois — ele é sobre
+Service Mesh, não sobre Connectivity Link. Já o Módulo 6 não pule: é ele que
+sustenta a diferença entre plataforma e gateway.
+====
+
+Comece por xref:02-ambiente.adoc[Seu ambiente].

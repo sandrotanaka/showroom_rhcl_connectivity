@@ -1,0 +1,160 @@
+= Módulo 7 — A borda não é a única fronteira
+:navtitle: Módulo 7 — Leste-oeste
+
+*Tempo: 14 minutos*
+
+Este módulo é sobre **Service Mesh**, não sobre Connectivity Link. Ele existe
+porque a pergunta vem sozinha depois do Módulo 1: *"então a chave de API protege
+tudo?"*
+
+Não protege. Ela abre a porta da rua.
+
+== Objetivos
+
+* Demonstrar que ninguém fala em texto claro dentro do namespace.
+* Mostrar que a autorização interna compara identidade, não IP nem cabeçalho.
+* Dividir tráfego entre duas versões sem tocar na aplicação.
+
+== Exercício 1: ninguém fala em texto claro
+
+. Confirme o modo de mTLS:
++
+[source,role="execute"]
+----
+oc get peerauthentication travel-agency-mtls -n travel-agency -o jsonpath='{.spec.mtls.mode}{"\n"}'
+----
+
+. Bata no `discounts` de **fora** do Service Mesh:
++
+[source,role="execute"]
+----
+oc run mtls-probe -n default --image=registry.access.redhat.com/ubi9/ubi-minimal \
+  --restart=Never --rm -i -- curl -s -m 6 -o /dev/null \
+  -w 'HTTP=%{http_code} exit=%{exitcode}\n' \
+  http://discounts.travel-agency:8000/discounts/probe
+----
+
+. Você deve ver `HTTP=000 exit=56`.
+
+Leia o resultado com atenção: não houve `403`, não houve `401` — **não houve
+HTTP**. A conexão foi resetada. O servidor derrubou antes, porque o cliente não
+apresentou certificado.
+
+[NOTE]
+====
+Em modo `PERMISSIVE`, a mesma sonda devolveria `403`: a conexão completaria e
+quem recusaria seria a `AuthorizationPolicy` do exercício seguinte. Os dois
+resultados parecem o mesmo evento e são camadas diferentes.
+====
+
+== Exercício 2: a chave abriu a porta da rua, não o cofre
+
+. Pergunte ao `discounts` a partir de cada serviço de dentro do namespace:
++
+[source,role="execute"]
+----
+for app in travels cars flights hotels insurances; do
+  P=$(oc get pod -n travel-agency -l app=$app -o name | head -1)
+  SA=$(oc get $P -n travel-agency -o jsonpath='{.spec.serviceAccountName}')
+  printf '%-11s (sa=%-18s) -> ' "$app" "$SA"
+  oc exec -n travel-agency $P -c $app -- curl -s -m 4 -o /dev/null \
+    -w '%{http_code}\n' "http://discounts.travel-agency:8000/discounts/$app"
+done
+----
+
+. Você deve ver:
++
+----
+travels     (sa=default           ) -> 403
+cars        (sa=discount-access-sa) -> 200
+flights     (sa=discount-access-sa) -> 200
+hotels      (sa=discount-access-sa) -> 200
+insurances  (sa=discount-access-sa) -> 200
+----
+
+O `travels` é justamente o serviço que recebeu a requisição autenticada por chave
+de API — e mesmo assim não entra. A recusa vem do _sidecar_: o processo do
+`discounts` nunca foi acordado.
+
+O que está sendo comparado não é IP nem cabeçalho: é o **SPIFFE ID que o mTLS
+provou**. Por isso este exercício depende do anterior.
+
+. Veja a regra:
++
+[source,role="execute"]
+----
+cat base/mesh/authorizationpolicy-discounts.yaml
+----
+
+== Exercício 3: versão é decisão de plataforma
+
+. Meça a divisão entre v1 e v2 do `discounts`:
++
+[source,role="execute"]
+----
+bash scripts/traffic.sh mesh-split
+----
+
+. Você deve ver aproximadamente 90/10.
+
+Antes da `VirtualService`, o mesmo comando media ~50/50 — _round-robin_ do
+Service, porque o Kubernetes só sabe balancear por pod.
+
+[TIP]
+====
+Não procure a versão na resposta: v1 e v2 são a mesma imagem. A divisão só existe
+na métrica e no grafo — que é exatamente o ponto. O comportamento de rota é da
+plataforma, não da aplicação.
+====
+
+== Verificação
+
+[source,role="execute"]
+----
+ansible-playbook ~/workshop/validation/module-07/validation.yml
+----
+
+.Se falhar
+[%collapsible]
+====
+*A sonda devolveu `403` em vez de `000`?* O `PeerAuthentication` está em
+`PERMISSIVE`. Confira o Exercício 1.
+
+*Todos os serviços deram `200`, inclusive o `travels`?* A `AuthorizationPolicy`
+não está aplicada:
+
+[source,role="execute"]
+----
+oc get authorizationpolicy -n travel-agency
+----
+====
+
+== Se sobrar tempo: o que acontece quando quebra
+
+[source,role="execute"]
+----
+bash scripts/demo.sh falha
+----
+
+Injeta `503` no `discounts` e reverte sozinho. Com o `discounts` 100% fora, a API
+na borda continua devolvendo `200`, com o catálogo completo e sem desconto —
+degradação graciosa.
+
+[WARNING]
+====
+Não use este cenário para demonstrar _retry_ ou _timeout_: os dois testes óbvios
+falham em silêncio neste ambiente.
+====
+
+== O que isso significa
+
+São duas perguntas diferentes, e elas precisam de duas respostas diferentes:
+
+* *quem é o cliente?* — respondida na borda, pelo Connectivity Link;
+* *quem é o serviço?* — respondida lá dentro, pelo Service Mesh.
+
+E o argumento fecha porque é o **mesmo Envoy** nas duas pontas: o `prod-web` é um
+gateway Istio. Você não montou duas infraestruturas; usou dois planos de controle
+sobre o mesmo dado.
+
+Siga para xref:99-conclusao.adoc[Conclusão].

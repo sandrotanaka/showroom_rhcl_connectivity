@@ -1,0 +1,134 @@
+= Módulo 6 — A policy nasce com o serviço
+:navtitle: Módulo 6 — Golden path
+
+*Tempo: 24 minutos*
+
+Este é o módulo onde as duas cadeiras da sala se encontram. Ele responde à
+objeção que sempre vem depois do Módulo 2: **"ok, mas quem escreve esse YAML?"**
+
+Se a resposta for *"a plataforma, sob demanda"*, você tem um gateway com fila de
+tickets. Se for *"o serviço já nasce com ele"*, você tem uma plataforma.
+
+== Objetivos
+
+* Localizar as policies no catálogo, separadas pelo alcance de cada uma.
+* Criar uma API nova pelo golden path, com policy de borda e plano comercial.
+* Explicar por que um serviço **não consegue nascer** sem essas quatro coisas.
+
+== Exercício 1: o catálogo
+
+. Abra o Red Hat Developer Hub:
++
+[source,role="execute"]
+----
+oc get route -A -l app.kubernetes.io/name=developer-hub -o jsonpath='{.items[0].spec.host}{"\n"}' 2>/dev/null \
+  || oc get route -A | grep -i developer-hub
+----
+
+. No catálogo, repare como as policies estão organizadas — pelo **escopo do
+  `targetRef`**, que é o que decide o alcance de cada uma:
++
+[cols="1,3"]
+|===
+| `rhcl-ingress` | o Gateway `prod-web` e as policies que miram o Gateway — valem para toda rota anexada
+| `travel-agency` | a aplicação e as policies que miram a HTTPRoute — valem só para essa API
+|===
+
+Os parceiros do Módulo 2 aparecem como consumidores, um por chave.
+
+== Exercício 2: criar uma API pelo golden path
+
+Em *Create* há três templates. A ordem deles é a jornada de uma API:
+
+[cols="1,2,2"]
+|===
+| Template | O que cria | Como entrega
+
+| *1. API como produto*
+| namespace já no Service Mesh, workload com ServiceAccount própria, HTTPRoute no
+  `prod-web`, `AuthPolicy`, `PlanPolicy`, `APIProduct`, mTLS `STRICT`,
+  `AuthorizationPolicy` e o par `DestinationRule`/`VirtualService`
+| repositório novo
+
+| *2. Assinar uma API*
+| o `APIKey` do developer portal, em `consumers/`
+| _pull request_
+
+| *3. Publicar uma v2*
+| a v2 ao lado da v1 e o peso no `VirtualService`
+| _pull request_
+|===
+
+. Execute o template *1. API como produto*. Preencha com um nome curto e seu.
+
+. Leia o formulário antes de submeter. Repare que ele **não pergunta se você quer
+  policy** — pergunta qual plano, qual identidade, qual peso. As decisões que
+  custaram tempo neste cluster estão fechadas na origem, inclusive o
+  _fail-open_ do predicado de plano, que o formulário expõe como escolha
+  explícita.
+
+. Acompanhe o resultado. O repositório gerado nasce com o topic
+  `rhcl-golden-path`; o `ApplicationSet` do cluster o descobre e o Argo aplica —
+  **não há passo de deploy**:
++
+[source,role="execute"]
+----
+oc get applications -n openshift-gitops
+----
+
+== Exercício 3: do portal ao IDE
+
+. Em qualquer componente do catálogo, no card *About*, clique em
+  **Abrir no Dev Spaces**. Sobe um IDE em container com o repositório já aberto —
+  as mesmas policies que você leu nos Módulos 1 a 3.
+
+[NOTE]
+====
+Se o link não estiver lá, o Dev Spaces não está instalado neste cluster. O
+catálogo omite o item em vez de publicar um destino morto.
+====
+
+== Verificação
+
+[source,role="execute"]
+----
+ansible-playbook ~/workshop/validation/module-06/validation.yml
+----
+
+.Se falhar
+[%collapsible]
+====
+*O repositório foi criado mas nada subiu no cluster?* O OpenShift GitOps pode não
+estar instalado. Sem ele, o template abre o _pull request_ e gera os manifests,
+mas nada sincroniza sozinho:
+
+[source,role="execute"]
+----
+oc get applicationset -n openshift-gitops
+----
+
+*O template falhou na criação do repositório?* A integração com o GitLab precisa
+de credencial válida. Confira com `bash scripts/preflight.sh` (completo, não
+`core`) — a seção de GitLab diz exatamente o que falta.
+====
+
+== O que isso significa
+
+O ponto do golden path **não é digitar menos**. É que um serviço novo não
+consegue nascer sem:
+
+* namespace no Service Mesh,
+* policy de borda,
+* plano comercial,
+* fronteira leste-oeste.
+
+Compare com o caminho usual: o serviço nasce, vai para produção, e a policy vira
+um item de backlog da plataforma — que chega semanas depois, quando alguém
+lembra. A diferença entre as duas situações não é ferramenta; é **onde a decisão
+mora**.
+
+Para a cadeira de desenvolvimento: você ganhou autonomia sem ganhar a
+responsabilidade de acertar segurança sozinho. Para a cadeira de plataforma: você
+distribuiu a execução sem distribuir a decisão.
+
+Siga para xref:09-modulo-07-leste-oeste.adoc[Módulo 7].

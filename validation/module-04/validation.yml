@@ -1,0 +1,62 @@
+---
+# Modulo 4 -- Isso vira numero de negocio
+# Consulta o Thanos do proprio cluster; o token vem do contexto do oc.
+- name: "Modulo 4 — metrica quebrada por plano"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Tarefa 1 — o TelemetryPolicy esta Enforced
+      kubernetes.core.k8s_info:
+        api_version: extensions.kuadrant.io/v1alpha1
+        kind: TelemetryPolicy
+        name: prod-web-telemetry
+        namespace: ingress-gateway
+      register: r_tel
+
+    - name: Descobrir a rota do Thanos
+      kubernetes.core.k8s_info:
+        api_version: route.openshift.io/v1
+        kind: Route
+        name: thanos-querier
+        namespace: openshift-monitoring
+      register: r_thanos
+
+    - name: Obter o token da sessao
+      ansible.builtin.command: oc whoami -t
+      register: r_token
+      changed_when: false
+
+    - name: Tarefa 2 — o Thanos responde com a dimensao 'plan'
+      ansible.builtin.uri:
+        url: "https://{{ r_thanos.resources[0].spec.host }}/api/v1/query?query={{ 'sum by (plan) (authorized_calls)' | urlencode }}"
+        headers:
+          Authorization: "Bearer {{ r_token.stdout }}"
+        validate_certs: false
+      register: r_q
+
+    - name: Consolidar
+      ansible.builtin.set_fact:
+        _t1: "{{ (r_tel.resources | default([]) | length > 0) and
+                 (r_tel.resources[0].status.conditions
+                  | selectattr('type','equalto','Enforced')
+                  | selectattr('status','equalto','True') | list | length > 0) }}"
+        _planos: "{{ r_q.json.data.result | default([]) | map(attribute='metric.plan') | select('defined') | unique | list }}"
+
+    - name: Consolidar (2)
+      ansible.builtin.set_fact:
+        _t2: "{{ _planos | length > 0 }}"
+
+    - name: Resultado
+      ansible.builtin.assert:
+        that: [_t1 | bool, _t2 | bool]
+        success_msg: |
+          OK Tarefa 1: TelemetryPolicy prod-web-telemetry Enforced
+          OK Tarefa 2: Thanos responde por plano: {{ _planos | join(' ') }}
+        fail_msg: |
+          {{ 'OK  ' if _t1 else 'FALHOU' }} Tarefa 1: TelemetryPolicy Enforced
+          {{ 'OK  ' if _t2 else 'FALHOU' }} Tarefa 2: series com label 'plan' no Thanos
+
+          Sem serie nenhuma, a coleta ainda nao aconteceu -- gere trafego e espere:
+            bash scripts/traffic.sh tiers && sleep 60
+          Com serie mas sem label 'plan', o TelemetryPolicy nao esta valendo.

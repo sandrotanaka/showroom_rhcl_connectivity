@@ -1,0 +1,18 @@
+# Nookbag -- painel direito do Showroom.
+# Sem tabs o painel abre em branco; o DOMAIN e resolvido em runtime.
+antora:
+  name: modules
+  dir: content
+  modules:
+    - ROOT
+
+tabs:
+  - name: Terminal
+    path: /wetty
+    port: 443
+  - name: OpenShift
+    url: 'https://console-openshift-console.${DOMAIN}'
+  - name: Grafana
+    url: 'https://grafana-route-grafana.${DOMAIN}'
+  - name: Developer Hub
+    url: 'https://developer-hub.${DOMAIN}'

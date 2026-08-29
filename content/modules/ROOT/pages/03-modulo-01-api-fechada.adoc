@@ -1,0 +1,132 @@
+= Módulo 1 — A API está fechada por padrão
+:navtitle: Módulo 1 — A API está fechada
+
+*Tempo: 10 minutos*
+
+A API da Travel Agency está no ar. A primeira pergunta comercial é *quem entra*.
+
+== Objetivos
+
+Ao final deste módulo você será capaz de:
+
+* Explicar por que a aplicação recusa uma requisição sem ter código de autenticação.
+* Ler o motivo da recusa no cabeçalho da resposta, não no corpo.
+* Demonstrar que assinar um produto de API não dá acesso a outro no mesmo gateway.
+
+== Exercício 1: bater na porta sem chave
+
+. Rode o gerador de tráfego no modo anônimo:
++
+[source,role="execute"]
+----
+bash scripts/traffic.sh anon
+----
+
+. Você deve ver:
++
+----
+sem chave        -> 401
+chave invalida   -> 401
+
+cabecalhos da recusa:
+  HTTP/2 401
+  www-authenticate: APIKEY realm="api-key-authn"
+  x-ext-auth-reason: credential not found
+----
+
+O interessante não é o `401`. É onde ele foi decidido.
+
+. Confirme que a aplicação não tem nada a ver com isso:
++
+[source,role="execute"]
+----
+oc logs -n travel-agency deploy/travels --tail=5
+----
+
+Nenhuma linha sobre a requisição recusada. O processo do `travels` **nunca foi
+acordado**: quem respondeu foi o gateway.
+
+. Veja quem respondeu:
++
+[source,role="execute"]
+----
+cat base/policies-security/travel-agency-authpolicy.yaml
+----
+
+== Exercício 2: a chave certa, no produto errado
+
+Há um segundo produto de API no mesmo gateway, o `echo-api`. Se a chave fosse
+uma credencial de gateway, a chave do `travels` funcionaria nele.
+
+. Pegue uma chave gold do `travels` e o hostname do `echo-api`:
++
+[source,role="execute"]
+----
+KEY=$(oc get secret -n kuadrant-system -l app=partner,kuadrant.io/plan-id=gold \
+  -o jsonpath='{.items[0].data.api_key}' | base64 -d)
+ECHO_HOST=$(oc get httproute -n echo-api -o jsonpath='{.items[0].spec.hostnames[0]}')
+echo "echo-api: $ECHO_HOST"
+----
+
+. Use a chave do `travels` contra o `echo-api`:
++
+[source,role="execute"]
+----
+curl -sk -o /dev/null -w 'echo-api com chave do travels -> %{http_code}\n' \
+  "https://${ECHO_HOST}/?APIKEY=${KEY}"
+----
+
+. Você deve ver `401`. Veja por quê:
++
+[source,role="execute"]
+----
+oc get authpolicy -n echo-api -o yaml | grep -A6 'selector:'
+----
+
+O selector do `AuthPolicy` do `echo-api` exige também o label
+`devportal.kuadrant.io/apiproduct`. **Assinatura é por produto, não por gateway.**
+
+== Verificação
+
+[source,role="execute"]
+----
+ansible-playbook ~/workshop/validation/module-01/validation.yml
+----
+
+*Você deve ver* as três tarefas com `✅`.
+
+.Se falhar
+[%collapsible]
+====
+*Recebeu `500` em vez de `401`?* A policy não tem culpa. O Authorino
+provavelmente caiu por pressão de disco no nó:
+
+[source,role="execute"]
+----
+oc get pods -n kuadrant-system -l app=authorino
+oc describe node | grep -i diskpressure
+----
+
+*Recebeu `200` sem chave?* A `AuthPolicy` não está `Enforced`. Confira o status:
+
+[source,role="execute"]
+----
+oc get authpolicy travel-agency-authpolicy -n travel-agency \
+  -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\n"}{end}'
+----
+====
+
+== O que isso significa
+
+A equipe de aplicação não escreveu autenticação. A plataforma escreveu — e vale
+para **qualquer rota** que passe por aqui, inclusive as que ainda não existem.
+
+Isso muda quem é responsável pelo quê. Numa arquitetura em que cada serviço
+autentica por conta própria, uma mudança de política de credencial é um épico
+com N times. Aqui é um objeto.
+
+Guarde a pergunta que vem naturalmente agora — *"então a chave de API protege
+tudo?"*. O xref:09-modulo-07-leste-oeste.adoc[Módulo 7] responde, e a resposta é
+não.
+
+Siga para xref:04-modulo-02-planos.adoc[Módulo 2].

@@ -1,0 +1,138 @@
+= Módulo 3 — Precedência é explícita
+:navtitle: Módulo 3 — Precedência
+
+*Tempo: 14 minutos*
+
+Você já viu duas policies. Num cluster real há dezenas, escritas por times
+diferentes, e várias miram o mesmo tráfego. A pergunta que decide se a
+plataforma é operável é: **quando duas policies se sobrepõem, quem vence — e
+como eu descubro?**
+
+== Objetivos
+
+* Ler no status de uma policy que ela foi sobreposta, e por quem.
+* Distinguir policy de Gateway de policy de rota, e saber qual cede.
+* Reconhecer os artefatos de data plane que o `PlanPolicy` gerou sozinho.
+
+== Exercício 1: a policy que não está valendo
+
+Há uma `AuthPolicy` no Gateway `prod-web` que nega tudo. Se ela estivesse
+valendo, o Módulo 2 não teria funcionado.
+
+. Leia o status dela:
++
+[source,role="execute"]
+----
+oc get authpolicy prod-web-deny-all -n ingress-gateway \
+  -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.message}){"\n"}{end}'
+----
+
+. Você deve ver:
++
+----
+Accepted=True  (AuthPolicy has been accepted)
+Enforced=False (AuthPolicy is overridden by [travel-agency/travel-agency-authpolicy
+                                             echo-api/echo-api-authpolicy])
+----
+
+Leia a segunda linha devagar. Ela não diz apenas que a policy foi sobreposta:
+**nomeia quem venceu**, rota por rota.
+
+. Faça o mesmo com a policy de rate limit do Gateway:
++
+[source,role="execute"]
+----
+oc get ratelimitpolicy ingress-gateway-rlp-lowlimits -n ingress-gateway \
+  -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.message}){"\n"}{end}'
+----
+
+A regra é a mesma nos dois casos: **policies que miram o Gateway valem para toda
+rota anexada e cedem onde a rota declara a sua**.
+
+== Exercício 2: o mesmo fork, desenhado
+
+. No console, abra *Connectivity Link* → *Policy Topology*:
++
+[source,role="execute"]
+----
+oc whoami --show-console
+----
+
+O listener bifurca para as duas rotas, e as policies chegam como aresta
+tracejada.
+
+[NOTE]
+====
+O grafo **não marca quem venceu** — não existe selo de *overridden* no desenho.
+O desenho faz a pergunta; o campo de status responde. Não perca tempo procurando
+na tela: você já leu a resposta no exercício anterior.
+====
+
+== Exercício 3: o que a policy gerou sozinha
+
+O `PlanPolicy` do Módulo 2 tem cerca de 30 linhas úteis. Veja o que ele produziu
+sem que ninguém escrevesse nada à mão.
+
+. Um contador por plano, no Limitador:
++
+[source,role="execute"]
+----
+oc get limitador limitador -n kuadrant-system -o jsonpath='{.spec.limits}' \
+  | python3 -m json.tool | head -30
+----
+
+. Os predicados por plano dentro do filtro do Envoy:
++
+[source,role="execute"]
+----
+oc get envoyfilter kuadrant-prod-web -n ingress-gateway \
+  -o jsonpath='{.spec.configPatches[0].patch.value.typed_config.value.config.configuration.value}' \
+  | python3 -m json.tool | grep -E 'auth.kuadrant.plan|metrics.labels'
+----
+
+[NOTE]
+====
+No Connectivity Link 1.4 sobre Service Mesh 3, o artefato de data plane é um
+`EnvoyFilter`. Em versões anteriores era um `WasmPlugin` — se você procurar por
+`wasmplugin` neste cluster, não encontra nada.
+====
+
+Repare no `metrics.labels.plan` que apareceu no meio da saída. Ele não veio do
+`PlanPolicy`: veio do `TelemetryPolicy`, e é a ponte para o próximo módulo.
+
+== Verificação
+
+[source,role="execute"]
+----
+ansible-playbook ~/workshop/validation/module-03/validation.yml
+----
+
+.Se falhar
+[%collapsible]
+====
+*A `prod-web-deny-all` aparece como `Enforced=True`?* Então as policies de rota
+não estão sendo reconhecidas, e o Módulo 2 teria falhado antes. Volte e rode
+`bash scripts/preflight.sh core`.
+
+*O `EnvoyFilter` não existe?* Confira se o que existe é um `WasmPlugin` — nesse
+caso o cluster está numa release anterior à 1.4, e o comando do Exercício 3 muda
+de nome, não de sentido:
+
+[source,role="execute"]
+----
+oc get wasmplugin,envoyfilter -n ingress-gateway
+----
+====
+
+== O que isso significa
+
+Numa stack montada com anotações de ingress ou EnvoyFilter escrito à mão,
+descobrir qual regra prevaleceu é arqueologia: você lê configuração gerada,
+compara com o que achava que tinha aplicado, e adivinha. Aqui é um **campo de
+status**, e ele nomeia o vencedor.
+
+Isso é o que permite que dois times escrevam policy sobre o mesmo tráfego sem
+combinar antes. A plataforma define o padrão no Gateway; o time da API
+especializa na rota; e a diferença entre os dois é auditável por `oc get`.
+
+Siga para xref:06-modulo-04-metricas.adoc[Módulo 4].

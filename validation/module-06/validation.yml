@@ -1,0 +1,64 @@
+---
+# Modulo 6 -- A policy nasce com o servico
+# Verifica o resultado do golden path: um namespace novo, ja com policy de borda.
+- name: "Modulo 6 — golden path"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    # Passe o nome da API criada:  -e api_name=minha-api
+    api_name: "{{ lookup('env','API_NAME') | default('', true) }}"
+  tasks:
+    - name: Tarefa 1 — o ApplicationSet do golden path existe
+      kubernetes.core.k8s_info:
+        api_version: argoproj.io/v1alpha1
+        kind: ApplicationSet
+        namespace: openshift-gitops
+      register: r_appset
+      ignore_errors: true
+
+    - name: Tarefa 2 — ha uma Application sincronizada alem da propria demo
+      kubernetes.core.k8s_info:
+        api_version: argoproj.io/v1alpha1
+        kind: Application
+        namespace: openshift-gitops
+      register: r_apps
+      ignore_errors: true
+
+    - name: Tarefa 3 — a API criada nasceu com AuthPolicy propria
+      kubernetes.core.k8s_info:
+        api_version: kuadrant.io/v1
+        kind: AuthPolicy
+      register: r_auth
+      ignore_errors: true
+
+    - name: Consolidar
+      ansible.builtin.set_fact:
+        _t1: "{{ r_appset.resources | default([]) | length > 0 }}"
+        _synced: "{{ r_apps.resources | default([])
+                     | selectattr('status.sync.status','defined')
+                     | selectattr('status.sync.status','equalto','Synced') | list }}"
+        _ns_novos: "{{ r_auth.resources | default([])
+                       | map(attribute='metadata.namespace') | unique | list
+                       | difference(['travel-agency','echo-api','ingress-gateway']) }}"
+
+    - name: Consolidar (2)
+      ansible.builtin.set_fact:
+        _t2: "{{ _synced | length > 0 }}"
+        _t3: "{{ _ns_novos | length > 0 }}"
+
+    - name: Resultado
+      ansible.builtin.assert:
+        that: [_t1 | bool, _t2 | bool, _t3 | bool]
+        success_msg: |
+          OK Tarefa 1: ApplicationSet presente (o repositorio novo e descoberto sozinho)
+          OK Tarefa 2: {{ _synced | length }} Application(s) sincronizada(s)
+          OK Tarefa 3: API nova nasceu com AuthPolicy propria em: {{ _ns_novos | join(' ') }}
+        fail_msg: |
+          {{ 'OK  ' if _t1 else 'FALHOU' }} Tarefa 1: ApplicationSet em openshift-gitops
+          {{ 'OK  ' if _t2 else 'FALHOU' }} Tarefa 2: alguma Application Synced
+          {{ 'OK  ' if _t3 else 'FALHOU' }} Tarefa 3: namespace novo com AuthPolicy
+
+          Sem o OpenShift GitOps o template abre o PR e gera os manifests, mas
+          nada sincroniza sozinho:
+            bash scripts/provision.sh gitops

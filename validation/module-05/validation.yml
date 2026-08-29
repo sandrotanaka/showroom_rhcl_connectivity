@@ -1,0 +1,56 @@
+---
+# Modulo 5 -- O caminho todo e rastreavel
+- name: "Modulo 5 — rastreabilidade"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Descobrir a rota do Thanos
+      kubernetes.core.k8s_info:
+        api_version: route.openshift.io/v1
+        kind: Route
+        name: thanos-querier
+        namespace: openshift-monitoring
+      register: r_thanos
+
+    - name: Obter o token da sessao
+      ansible.builtin.command: oc whoami -t
+      register: r_token
+      changed_when: false
+
+    - name: Tarefa 1 — a Service Mesh esta instrumentada (istio_requests_total)
+      ansible.builtin.uri:
+        url: "https://{{ r_thanos.resources[0].spec.host }}/api/v1/query?query={{ 'count(istio_requests_total)' | urlencode }}"
+        headers: {Authorization: "Bearer {{ r_token.stdout }}"}
+        validate_certs: false
+      register: r_istio
+
+    - name: Tarefa 2 — o fan-out chegou ao discounts (nivel mais profundo do grafo)
+      ansible.builtin.uri:
+        url: "https://{{ r_thanos.resources[0].spec.host }}/api/v1/query?query={{ 'sum(istio_requests_total{destination_service_name=\"discounts\"})' | urlencode }}"
+        headers: {Authorization: "Bearer {{ r_token.stdout }}"}
+        validate_certs: false
+      register: r_disc
+
+    - name: Consolidar
+      ansible.builtin.set_fact:
+        _t1: "{{ r_istio.json.data.result | default([]) | length > 0 }}"
+        _n: "{{ (r_disc.json.data.result | default([]) | map(attribute='value') | map('last') | first) | default(0) | float }}"
+
+    - name: Consolidar (2)
+      ansible.builtin.set_fact:
+        _t2: "{{ _n | float > 0 }}"
+
+    - name: Resultado
+      ansible.builtin.assert:
+        that: [_t1 | bool, _t2 | bool]
+        success_msg: |
+          OK Tarefa 1: Service Mesh instrumentada, metricas no Thanos
+          OK Tarefa 2: o discounts recebeu {{ _n | int }} requisicao(oes) -- o grafo tem o nivel profundo
+        fail_msg: |
+          {{ 'OK  ' if _t1 else 'FALHOU' }} Tarefa 1: istio_requests_total no Thanos
+          {{ 'OK  ' if _t2 else 'FALHOU' }} Tarefa 2: trafego chegando ao discounts
+
+          O grafo para em 'prod-web -> travels' quando o trafego nao tem o header
+          'user' nem usa /travels/<cidade>. Rode o modo correto e espere a coleta:
+            DURATION=120 bash scripts/traffic.sh mesh

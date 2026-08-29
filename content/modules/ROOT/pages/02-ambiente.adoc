@@ -1,0 +1,123 @@
+= Seu ambiente
+:navtitle: Seu ambiente
+
+*Tempo: 10 minutos*
+
+Você tem um cluster OpenShift Single Node só seu, provisionado para este
+workshop. Ele será destruído ao final — pode experimentar à vontade.
+
+== Exercício 1: entrar no cluster
+
+. No terminal ao lado, autentique-se:
++
+[source,role="execute"]
+----
+oc login -u {user} -p {password} {openshift_api_url} --insecure-skip-tls-verify
+----
+
+. Confirme quem você é e onde está:
++
+[source,role="execute"]
+----
+oc whoami && oc whoami --show-console
+----
+
+== Exercício 2: trazer o repositório da demo
+
+Os comandos do workshop vêm de scripts versionados. Eles descobrem hostname,
+release e credenciais **do cluster, na hora** — nenhum deles tem endereço
+embutido, o que é justamente o motivo de funcionarem no seu cluster e no de
+todos os outros participantes ao mesmo tempo.
+
+. Clone o repositório:
++
+[source,role="execute"]
+----
+git clone {repo_url} ~/rhcl && cd ~/rhcl
+----
+
+. Clone também o repositório deste workshop — é dele que vêm as verificações
+  ao final de cada módulo:
++
+[source,role="execute"]
+----
+git clone {workshop_repo_url} ~/workshop
+----
+
+. Descubra o hostname da API **a partir do cluster** — você vai usá-lo em
+  vários módulos:
++
+[source,role="execute"]
+----
+export API_HOST=$(oc get httproute travel-agency -n travel-agency -o jsonpath='{.spec.hostnames[0]}')
+echo "API: https://$API_HOST"
+----
+
+[WARNING]
+====
+Não copie hostname de nenhum documento — nem deste. O cluster é efêmero e o
+endereço muda a cada provisionamento. Toda vez que o guia precisar de um
+endereço, ele mostra o comando que o descobre.
+====
+
+== Exercício 3: a demo está de pé?
+
+O repositório traz um verificador que percorre a cadeia inteira — operadores,
+Gateway, policies, chaves, tráfego real, observabilidade — e cada falha vem com a
+correção ao lado.
+
+. Rode o caminho de dados, que é o que os Módulos 1 a 4 exigem:
++
+[source,role="execute"]
+----
+bash scripts/preflight.sh core
+----
+
+. A saída termina assim quando tudo está pronto:
++
+[source,subs="attributes"]
+----
+[OK] Gateway prod-web Programmed
+[OK] HTTPRoute travel-agency -> travel.apps.<seu-cluster>
+[OK] authpolicy/travel-agency-authpolicy Accepted+Enforced
+[OK] planpolicy/travels-plans Accepted+Enforced
+[OK] 4 chaves, todas com tier: free gold silver
+[OK] demo pronta.
+----
+
+== Verificação
+
+[source,role="execute"]
+----
+bash scripts/preflight.sh core && echo "AMBIENTE PRONTO"
+----
+
+*Você deve ver* `AMBIENTE PRONTO` na última linha.
+
+.Se falhar
+[%collapsible]
+====
+Se o verificador acusar recursos ausentes, aplique a camada de demo e verifique
+de novo:
+
+[source,role="execute"]
+----
+oc apply -k {overlay}
+bash scripts/preflight.sh core
+----
+
+Aplicar o overlay de outra release quebra em dois lugares ao mesmo tempo: o
+hostname da rota vira o de outro cluster, e uma `RateLimitPolicy` plana volta ao
+render e **sobrepõe** o `PlanPolicy` — os três planos do Módulo 2 somem, sem
+erro nenhum. Use exatamente `{overlay}`.
+====
+
+== O que isso significa
+
+Você acabou de rodar uma verificação que cobre policy, tráfego real, métrica e
+console — e ela é o mesmo comando que a equipe roda antes de apresentar esta demo
+a um cliente. Um ambiente de API que não pode ser verificado por um comando não é
+uma plataforma; é um conjunto de configurações que alguém espera que ainda
+estejam lá.
+
+Siga para xref:03-modulo-01-api-fechada.adoc[Módulo 1].

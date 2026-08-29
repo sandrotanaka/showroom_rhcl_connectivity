@@ -1,0 +1,48 @@
+---
+# Modulo 3 -- Precedencia e explicita
+- name: "Modulo 3 — precedencia de policies"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Tarefa 1 — a AuthPolicy do Gateway esta Accepted mas NAO Enforced
+      kubernetes.core.k8s_info:
+        api_version: kuadrant.io/v1
+        kind: AuthPolicy
+        name: prod-web-deny-all
+        namespace: ingress-gateway
+      register: r_deny
+
+    - name: Tarefa 2 — o EnvoyFilter do gateway existe (artefato de data plane no 1.4)
+      kubernetes.core.k8s_info:
+        api_version: networking.istio.io/v1alpha3
+        kind: EnvoyFilter
+        name: kuadrant-prod-web
+        namespace: ingress-gateway
+      register: r_ef
+      ignore_errors: true
+
+    - name: Consolidar
+      ansible.builtin.set_fact:
+        _cond: "{{ r_deny.resources[0].status.conditions | default([]) }}"
+    - name: Consolidar (2)
+      ansible.builtin.set_fact:
+        _t1: "{{ (_cond | selectattr('type','equalto','Accepted') | selectattr('status','equalto','True') | list | length > 0)
+                 and (_cond | selectattr('type','equalto','Enforced') | selectattr('status','equalto','False') | list | length > 0) }}"
+        _msg: "{{ (_cond | selectattr('type','equalto','Enforced') | map(attribute='message') | first) | default('sem mensagem') }}"
+        _t2: "{{ r_ef.resources | default([]) | length > 0 }}"
+
+    - name: Resultado
+      ansible.builtin.assert:
+        that: [_t1 | bool, _t2 | bool]
+        success_msg: |
+          OK Tarefa 1: prod-web-deny-all Accepted=True, Enforced=False
+                       quem venceu: {{ _msg }}
+          OK Tarefa 2: EnvoyFilter kuadrant-prod-web presente
+        fail_msg: |
+          {{ 'OK  ' if _t1 else 'FALHOU' }} Tarefa 1: a policy do Gateway devia ceder para as policies de rota
+                 status atual: {{ _msg }}
+          {{ 'OK  ' if _t2 else 'FALHOU' }} Tarefa 2: EnvoyFilter kuadrant-prod-web
+
+          Se o EnvoyFilter nao existe, veja se o cluster e de uma release anterior:
+            oc get wasmplugin,envoyfilter -n ingress-gateway

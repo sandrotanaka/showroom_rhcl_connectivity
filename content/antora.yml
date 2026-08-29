@@ -1,0 +1,20 @@
+name: modules
+title: Red Hat Connectivity Link — Workshop
+version: master
+nav:
+  - modules/ROOT/nav.adoc
+asciidoc:
+  attributes:
+    # Resolvidos em tempo de execucao pelo Showroom a partir do cluster.
+    # Nao escrever hostname nem senha aqui: o cluster e efemero.
+    openshift_console_url: '%ATTR_NOT_SET%'
+    openshift_api_url: '%ATTR_NOT_SET%'
+    cluster_domain: '%ATTR_NOT_SET%'
+    user: '%ATTR_NOT_SET%'
+    password: '%ATTR_NOT_SET%'
+    # Fixos do workshop
+    repo_url: 'https://github.com/sandrotanaka/rhcl-connectivity-demo'
+    workshop_repo_url: 'https://github.com/sandrotanaka/showroom_rhcl_connectivity'
+    overlay: 'overlays/rhcl-1.4'
+    experimental: ''
+    source-highlighter: rouge
