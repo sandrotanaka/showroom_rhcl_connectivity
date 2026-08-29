@@ -84,8 +84,9 @@ _lista() {
   done
   cat <<'EOF'
 
-Modulo sem 'pula' nao muda estado nenhum -- e so leitura e medicao, entao nao
-ha o que aplicar. Pular esses e fechar a pagina.
+Modulo sem 'pula' termina no mesmo estado em que comecou -- e leitura, medicao,
+ou um exercicio que se reverte. Nao ha estado final a aplicar; pular esses e
+fechar a pagina.
 EOF
 }
 
