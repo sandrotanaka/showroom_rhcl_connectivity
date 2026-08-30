@@ -74,8 +74,21 @@
       failed_when: false
 
     # ------------------------------------------------------------------ ---
+    - name: "Inventario -- o que existe, e nao so o que esta errado"
+      ansible.builtin.command: "{{ item }}"
+      loop:
+        - oc get istio -A --no-headers
+        - oc get kuadrant -A --no-headers
+        - oc get crd pipelineruns.tekton.dev --no-headers
+      register: d_inv
+      changed_when: false
+      failed_when: false
+
     - name: "Achados"
       ansible.builtin.set_fact:
+        d_istio: "{{ (d_inv.results[0].stdout | default('')) | trim }}"
+        d_kuad_cr: "{{ (d_inv.results[1].stdout | default('')) | trim }}"
+        d_tekton: "{{ (d_inv.results[2].stdout | default('')) | trim }}"
         d_pressao: "{{ d_nodes.resources | default([]) | map(attribute='status.conditions') | flatten
                        | selectattr('type','search','Pressure') | selectattr('status','equalto','True')
                        | map(attribute='type') | unique | list }}"
@@ -115,6 +128,20 @@
           DIAGNOSTICO DE PLATAFORMA
           ===========================================================
           sessao: {{ d_who.stdout | default('NAO AUTENTICADO') }}
+
+          -- o que existe ------------------------------------------------
+          {{ '[ok]' if d_istio | length > 0 else '[--]' }} Service Mesh (CR Istio)
+          {{ '[ok]' if d_kuad_cr | length > 0 else '[--]' }} Connectivity Link (CR Kuadrant)
+          {{ '[ok]' if d_gw.resources | default([]) | length > 0 else '[--]' }} Gateway ({{ d_gw.resources | default([]) | length }})
+          {{ '[ok]' if d_book.resources | default([]) | length > 0 else '[--]' }} aplicacao do laboratorio ({{ d_book.resources | default([]) | length }} pods em bookinfo)
+          {{ '[ok]' if d_appset.resources | default([]) | length > 0 else '[--]' }} ApplicationSet do golden path
+          {{ '[ok]' if d_tekton | length > 0 else '[--]' }} OpenShift Pipelines
+          {% if d_istio | length == 0 or d_kuad_cr | length == 0 %}
+          [!] A PLATAFORMA AINDA NAO ESTA MONTADA. Nao adianta depurar modulo:
+              os operadores podem estar instalados e os CR nao existirem -- que e
+              um estado que o oc get csv nao distingue.
+                bash ~/rhcl/scripts/provision.sh --check
+          {% endif %}
 
           {% if d_pressao | length > 0 %}
           [!] NO SOB PRESSAO: {{ d_pressao | join(', ') }}

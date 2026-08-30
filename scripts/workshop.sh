@@ -132,6 +132,12 @@ EOF
 # dependem de oc no PATH do pod. Por isso o certo e apontar
 # showroom.terminal.image para uma imagem com Ansible, e deixar o fallback como
 # rede de seguranca -- nao como caminho principal.
+# O callback 'debug' e o que renderiza msg multilinha. Sem ele o Ansible imprime
+# o relatorio como string JSON com \n escapado -- ilegivel exatamente no momento
+# em que a pessoa mais precisa ler.
+export ANSIBLE_STDOUT_CALLBACK=debug
+export ANSIBLE_DISPLAY_SKIPPED_HOSTS=false
+
 _ansible() { # arquivo
   local _p="$1"
   if command -v ansible-playbook >/dev/null 2>&1; then
