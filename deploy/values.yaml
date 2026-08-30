@@ -63,6 +63,20 @@ showroom:
     homeStorage: "5Gi"
 
 
+  # CREDENCIAIS DO PARTICIPANTE.
+  #
+  # Num pedido pela RHDP elas chegam pelo formulario e o Showroom as injeta
+  # sozinho. Num deploy manual, ninguem as fornece -- e ai o primeiro comando do
+  # guia ('oc login -u {user} -p {password}') renderiza %ATTR_NOT_SET% e o
+  # participante nao consegue nem comecar.
+  #
+  # Preencha aqui SO em deploy manual. Vao para uma ConfigMap, como a RHDP
+  # tambem faz -- nao e lugar de credencial de producao, e sim de laboratorio
+  # efemero.
+  credenciais:
+    user: ""
+    password: ""
+
 # ------------------------------------------------------------------ userinfo
 # ConfigMap com o label que a RHDP le para mostrar dados ao participante.
 userinfo:

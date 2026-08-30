@@ -93,6 +93,14 @@ data:
     openshift_console_url: https://console-openshift-console.{{ .Values.deployer.domain }}
     repo_url: {{ .Values.plataforma.repo.url }}
     workshop_repo_url: {{ include "workshop.contentRepo" . }}
+    {{- with .Values.showroom.credenciais }}
+    {{- if .user }}
+    user: {{ .user }}
+    {{- end }}
+    {{- if .password }}
+    password: {{ .password }}
+    {{- end }}
+    {{- end }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
