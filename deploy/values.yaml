@@ -1,0 +1,76 @@
+# ===========================================================================
+# Chart do workshop para o CI *Field Content* da RHDP.
+#
+# O contrato do ocp4_workload_field_content e curto: uma Application do Argo
+# apontando para este repositorio, e estes valores injetados na hora:
+#
+#   deployer.domain / deployer.apiUrl     sempre
+#   gitops.repoURL / revision / path      o repositorio que o CI recebeu
+#   litemaas.*, multi_user.*              quando o catalogo os fornece
+#
+# NAO ESCREVA HOSTNAME AQUI. O cluster e efemero e o dominio chega por
+# deployer.domain, resolvido no momento do provisionamento.
+# ===========================================================================
+
+# ---------------------------------------------------------------- injetados
+# Ficam vazios de proposito: quem preenche e o workload, no provisionamento.
+deployer:
+  domain: ""
+  apiUrl: ""
+
+# ATENCAO AO 'URL' MAIUSCULO. O role injeta 'gitops.repoURL'; o exemplo do
+# template declara 'gitops.repoUrl' e por isso NAO recebe a injecao -- quem
+# forka e nao troca a linha a mao sobe o conteudo do repositorio upstream, sem
+# erro nenhum. Aqui usamos o nome que o role escreve.
+gitops:
+  repoURL: ""
+  revision: "main"
+  path: ""
+
+# ------------------------------------------------------------------ showroom
+showroom:
+  enabled: true
+  name: showroom
+  namespace: showroom
+
+  content:
+    # Vazio = usa gitops.repoURL, ou seja, ESTE repositorio. O guia e o chart
+    # moram juntos, entao a versao do guia acompanha a do deploy sozinha.
+    repoUrl: ""
+    repoRef: ""
+    antoraPlaybook: "default-site.yml"
+    image: "quay.io/rhpds/showroom-content:v1.3.1"
+
+  nookbag:
+    enabled: true
+    bundleUrl: "https://github.com/rhpds/nookbag/releases/download/nookbag-v0.2.1/nookbag-v0.2.1.zip"
+
+  terminal:
+    enabled: true
+    # A IMAGEM DO TERMINAL E O UNICO PONTO DE ATENCAO DESTE CHART.
+    #
+    # Os quatro verbos do workshop (verifica/diagnostica/corrige/pula) rodam
+    # playbooks Ansible com a collection kubernetes.core. A imagem padrao do
+    # Showroom traz 'oc' e 'git', mas nao garante Ansible.
+    #
+    # O scripts/workshop.sh detecta a ausencia e cai para um pod descartavel
+    # com imagem que tenha Ansible, usando o SEU token -- entao o workshop
+    # funciona nos dois casos. Apontar aqui uma imagem com Ansible so evita a
+    # espera do pod a cada verbo.
+    image: "quay.io/rhpds/openshift-showroom-terminal-ocp:latest"
+    resources:
+      requests: {cpu: "500m", memory: "512Mi"}
+      limits:   {cpu: "1",    memory: "1Gi"}
+    homeStorage: "5Gi"
+
+  # Imagem usada pelo fallback quando o terminal nao tem Ansible.
+  runnerImage: "quay.io/rhpds/ansible-runner-ocp:latest"
+
+# ------------------------------------------------------------------ userinfo
+# ConfigMap com o label que a RHDP le para mostrar dados ao participante.
+userinfo:
+  enabled: true
+  title: "Workshop — Do repositório ao produto de API"
+  instructions: >-
+    Abra o guia do laboratório e siga a partir de "Seu ambiente". O terminal
+    fica na aba ao lado; todo comando do dia sai de lá.

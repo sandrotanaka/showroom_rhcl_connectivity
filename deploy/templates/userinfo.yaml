@@ -1,0 +1,20 @@
+{{- if .Values.userinfo.enabled }}
+---
+# O label 'demo.redhat.com/userinfo' e o que a RHDP le para mostrar dados ao
+# participante na tela do servico. Sem ele, o ConfigMap e so um ConfigMap.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workshop-userinfo
+  namespace: {{ .Values.showroom.namespace }}
+  labels:
+    demo.redhat.com/application: "workshop"
+    demo.redhat.com/userinfo: ""
+data:
+  demo_title: {{ .Values.userinfo.title | quote }}
+  access_instructions: {{ .Values.userinfo.instructions | quote }}
+  showroom_url: {{ include "workshop.url" . | quote }}
+  openshift_console_url: "https://console-openshift-console.{{ .Values.deployer.domain }}"
+  openshift_api_url: {{ .Values.deployer.apiUrl | quote }}
+  cluster_domain: {{ .Values.deployer.domain | quote }}
+{{- end }}

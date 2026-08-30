@@ -110,6 +110,55 @@ restaurar, o proprio playbook diz isso -- e diz por que.
 EOF
 }
 
+# ---------------------------------------------------------------------------
+# COMO O PLAYBOOK RODA
+#
+# Se o terminal tem ansible-playbook, roda direto -- e e o caminho normal.
+#
+# Se nao tem (a imagem padrao do terminal do Showroom nao garante Ansible), cai
+# para um pod descartavel que CLONA ESTE REPOSITORIO e roda o playbook la
+# dentro. Clonar, e nao mandar os arquivos numa ConfigMap: os diagnosticos fazem
+# 'import_playbook: ../comum/...', e ConfigMap nao guarda subdiretorio -- achatar
+# os nomes quebraria justamente o import.
+#
+# CONSEQUENCIA A SABER: o pod roda o que esta no repositorio REMOTO. Edicao
+# local de playbook nao e vista por esse caminho.
+#
+# O POD USA O SEU TOKEN, e nao a ServiceAccount do namespace: assim o verbo mede
+# a SUA permissao (senao o modulo 1.6 estaria medindo outra identidade), e o
+# chart de deploy nao precisa de nenhum RoleBinding largo.
+#
+# LIMITE: playbooks que chamam o CLI 'oc' (o modulo 16 usa 'oc auth can-i --as')
+# dependem de oc no PATH do pod. Por isso o certo e apontar
+# showroom.terminal.image para uma imagem com Ansible, e deixar o fallback como
+# rede de seguranca -- nao como caminho principal.
+_ansible() { # arquivo
+  local _p="$1"
+  if command -v ansible-playbook >/dev/null 2>&1; then
+    ansible-playbook "$_p"
+    return $?
+  fi
+
+  local _img="${WORKSHOP_RUNNER_IMAGE:-quay.io/rhpds/ansible-runner-ocp:latest}"
+  local _tok _api _repo _rev
+  _tok="$(oc whoami -t 2>/dev/null || true)"
+  _api="$(oc whoami --show-server 2>/dev/null || true)"
+  [[ -n "$_tok" && -n "$_api" ]] || { echo "sem sessao: rode 'oc login' antes"; return 2; }
+
+  _repo="${WORKSHOP_REPO_URL:-$(git -C "$_DIR" remote get-url origin 2>/dev/null || true)}"
+  _rev="${WORKSHOP_REPO_REF:-$(git -C "$_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
+  [[ -n "$_repo" ]] || { echo "nao descobri a origem do repositorio; exporte WORKSHOP_REPO_URL"; return 2; }
+
+  local _rel="${_p#"$_DIR"/}"
+  echo "(sem ansible-playbook local -- rodando em pod com ${_img})"
+  oc run "workshop-run-$$" --rm -i --restart=Never --quiet --image="$_img" \
+    --env="K8S_AUTH_API_KEY=${_tok}" \
+    --env="K8S_AUTH_HOST=${_api}" \
+    --env="K8S_AUTH_VERIFY_SSL=false" \
+    -- sh -c "git clone --depth 1 --branch '${_rev}' '${_repo}' /w >/dev/null 2>&1 \
+              && cd /w && ansible-playbook '${_rel}'"
+}
+
 _roda() { # verbo modulo
   local _p; _p="$(_arquivo "$1" "$2")" || { _uso; exit 2; }
   if [[ -z "$_p" ]]; then
@@ -117,7 +166,7 @@ _roda() { # verbo modulo
     return 0
   fi
   echo "--> $1 modulo $2"
-  ansible-playbook "$_p"
+  _ansible "$_p"
 }
 
 _verbo="${1:-}"; _mod="${2:-}"
@@ -129,7 +178,7 @@ esac
 
 # 'diagnostica' sem numero olha so as camadas de plataforma
 if [[ "$_verbo" == "diagnostica" && -z "$_mod" ]]; then
-  ansible-playbook "${_VAL}/comum/diagnose-plataforma.yml"
+  _ansible "${_VAL}/comum/diagnose-plataforma.yml"
   exit $?
 fi
 

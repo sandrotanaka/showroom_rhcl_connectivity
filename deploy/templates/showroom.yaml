@@ -1,0 +1,254 @@
+{{- if .Values.showroom.enabled }}
+{{- $ns := .Values.showroom.namespace }}
+{{- $nome := .Values.showroom.name }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $ns }}
+  labels:
+    demo.redhat.com/application: "workshop"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $nome }}
+  namespace: {{ $ns }}
+---
+# 'edit' no PROPRIO namespace, e nao cluster-admin: a SA serve ao Showroom, e o
+# que o participante faz no cluster ele faz com o proprio login. Modulo 1.6.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: edit-{{ $nome }}-sa
+  namespace: {{ $ns }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: edit
+subjects:
+  - kind: ServiceAccount
+    name: {{ $nome }}
+    namespace: {{ $ns }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $nome }}-proxy-config
+  namespace: {{ $ns }}
+data:
+  nginx.conf: |
+    events {
+    }
+    error_log /dev/stdout info;
+    http {
+      include /etc/nginx/mime.types;
+      proxy_cache off;
+      expires -1;
+      proxy_cache_path /dev/null keys_zone=mycache:10m;
+      map $http_upgrade $connection_upgrade {
+          default upgrade;
+          '' close;
+      }
+      server {
+        listen 8080;
+        absolute_redirect off;
+        location / {
+          proxy_pass http://127.0.0.1:8000;
+          expires off;
+          proxy_cache off;
+          proxy_pass_request_headers on;
+          proxy_set_header Accept-Encoding "gzip";
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        {{- if .Values.showroom.terminal.enabled }}
+        location /terminal/ {
+          proxy_pass http://127.0.0.1:7681;
+          rewrite ^/terminal/(.*)$ /$1 break;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+          proxy_read_timeout 43200000;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header Host $http_host;
+          proxy_set_header X-NginX-Proxy true;
+        }
+        {{- end }}
+      }
+    }
+---
+# Os atributos que o guia le em runtime. Nenhum hostname escrito a mao: o
+# dominio vem de deployer.domain, injetado no provisionamento.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $nome }}-userdata
+  namespace: {{ $ns }}
+data:
+  user_data.yml: |
+    cluster_domain: {{ .Values.deployer.domain }}
+    openshift_api_url: {{ .Values.deployer.apiUrl }}
+    openshift_console_url: https://console-openshift-console.{{ .Values.deployer.domain }}
+    repo_url: {{ include "workshop.contentRepo" . }}
+    workshop_repo_url: {{ include "workshop.contentRepo" . }}
+    runner_image: {{ .Values.showroom.runnerImage }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $nome }}-terminal-lab-user-home
+  namespace: {{ $ns }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.showroom.terminal.homeStorage | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $nome }}
+  namespace: {{ $ns }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app.kubernetes.io/name: {{ $nome }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $nome }}
+  namespace: {{ $ns }}
+  labels:
+    demo.redhat.com/application: "workshop"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $nome }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $nome }}
+    spec:
+      serviceAccountName: {{ $nome }}
+      initContainers:
+        - name: git-cloner
+          image: "quay.io/rhpds/git-cloner:v1.1.2"
+          env:
+            - name: GIT_REPO_URL
+              value: {{ include "workshop.contentRepo" . | quote }}
+            - name: GIT_REPO_REF
+              value: {{ include "workshop.contentRef" . | quote }}
+            - name: CLONE_DIR
+              value: "/showroom/repo"
+          volumeMounts:
+            - {mountPath: /showroom/repo, name: showroom-files, subPath: repo}
+        - name: antora-builder
+          image: "quay.io/rhpds/antora:v1.0.1"
+          env:
+            - name: FILES_DIR
+              value: "/showroom/repo"
+            - name: OUTPUT_DIR
+              value: "/showroom/www"
+            - name: ANTORA_SITE_FILE
+              value: {{ .Values.showroom.content.antoraPlaybook | quote }}
+          volumeMounts:
+            - {mountPath: /showroom/repo, name: showroom-files, subPath: repo}
+            - {mountPath: /user_data/, name: user-data}
+            - {mountPath: /showroom/www, name: showroom-files, subPath: www}
+      containers:
+        - name: nginx
+          image: "quay.io/rhpds/nginx:1.25"
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - {mountPath: /etc/nginx/nginx.conf, name: nginx-config, subPath: nginx.conf}
+            - {mountPath: /var/cache/nginx, name: nginx-cache}
+            - {mountPath: /var/run, name: nginx-pid}
+          ports:
+            - {name: web, containerPort: 8080}
+        - name: content
+          image: {{ .Values.showroom.content.image | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: GIT_REPO_URL
+              value: {{ include "workshop.contentRepo" . | quote }}
+            - name: GIT_REPO_REF
+              value: {{ include "workshop.contentRef" . | quote }}
+            - name: ANTORA_PLAYBOOK
+              value: {{ .Values.showroom.content.antoraPlaybook | quote }}
+            - name: DOMAIN
+              value: {{ .Values.deployer.domain | quote }}
+            {{- if .Values.showroom.nookbag.enabled }}
+            - name: ZT_BUNDLE
+              value: {{ .Values.showroom.nookbag.bundleUrl | quote }}
+            - name: ZT_UI_ENABLED
+              value: "true"
+            - name: GUID
+              value: {{ $ns | quote }}
+            {{- end }}
+          volumeMounts:
+            - {mountPath: /user_data/, name: user-data}
+            - {mountPath: /showroom/repo, name: showroom-files, subPath: repo}
+            - {mountPath: /showroom/www, name: showroom-files, subPath: www}
+          ports:
+            - {containerPort: 8000, protocol: TCP}
+          livenessProbe:
+            httpGet: {path: /, port: 8000}
+          readinessProbe:
+            httpGet: {path: /, port: 8000}
+        {{- if .Values.showroom.terminal.enabled }}
+        - name: terminal
+          image: {{ .Values.showroom.terminal.image | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef: {fieldPath: metadata.namespace}
+            # Lido pelo scripts/workshop.sh quando o terminal nao tem Ansible.
+            - name: WORKSHOP_RUNNER_IMAGE
+              value: {{ .Values.showroom.runnerImage | quote }}
+          volumeMounts:
+            - {name: terminal-lab-user-home, mountPath: /home/lab-user}
+          ports:
+            - {containerPort: 7681, protocol: TCP}
+          resources:
+            {{- toYaml .Values.showroom.terminal.resources | nindent 12 }}
+        {{- end }}
+      volumes:
+        - {name: showroom-files, emptyDir: {}}
+        - {name: user-data, configMap: {name: {{ $nome }}-userdata}}
+        - {name: nginx-config, configMap: {defaultMode: 420, name: {{ $nome }}-proxy-config}}
+        - {name: nginx-pid, emptyDir: {}}
+        - {name: nginx-cache, emptyDir: {}}
+        - name: terminal-lab-user-home
+          persistentVolumeClaim:
+            claimName: {{ $nome }}-terminal-lab-user-home
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ $nome }}
+  namespace: {{ $ns }}
+  annotations:
+    haproxy.router.openshift.io/timeout: 1h
+    haproxy.router.openshift.io/timeout-tunnel: 1h
+spec:
+  to:
+    kind: Service
+    name: {{ $nome }}
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+{{- end }}

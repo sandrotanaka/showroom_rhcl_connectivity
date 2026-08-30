@@ -1,0 +1,8 @@
+apiVersion: v2
+name: workshop-plataforma
+description: >-
+  Workshop autoguiado "Do repositório ao produto de API" — servido pelo Showroom,
+  para o CI Field Content da RHDP.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
