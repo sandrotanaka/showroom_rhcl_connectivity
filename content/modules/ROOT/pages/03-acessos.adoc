@@ -108,6 +108,41 @@ só:
 | não tem senha própria — é o login unificado.
 |===
 
+== As quatro personas do golden path
+
+Elas existem no Keycloak e no GitLab, e o **acesso é assimétrico de propósito**:
+quem pede não é quem aprova. É essa assimetria que o módulo
+xref:16-t1-rbac.adoc[1.6] usa para mostrar permissão por função, e o
+xref:35-t3-golden-path.adoc[3.6] para a assinatura por _merge request_.
+
+[cols="1,1,2"]
+|===
+| Usuário | Papel | O que faz no roteiro
+
+| `globex-travel` | parceiro, tier *gold* | abre _merge request_ de assinatura. **Não aprova.**
+| `initech-voyages` | parceiro, tier *silver* | idem
+| `acme-trips` | parceiro, tier *free* | idem
+| `plat-eng` | engenharia de plataforma | **aprova e faz o merge** — é o controle de mudança em produção
+|===
+
+As quatro entram no **GitLab** e, por ele, no **Developer Hub** — que não tem
+senha própria.
+
+. A senha é a mesma para as quatro. Descubra-a com a folha:
++
+[source,role="execute"]
+----
+bash ~/rhcl/scripts/acessos.sh | grep -A1 'GitLab —'
+----
+
+[NOTE]
+====
+Ela não está escrita aqui de propósito: é um valor padrão do provisionamento
+(`KC_PERSONA_PASSWORD`), e um ambiente onde alguém a tenha trocado tornaria esta
+página mentirosa. O comando acima resolve sempre — e este guia é um repositório
+público.
+====
+
 == A folha completa, resolvida do cluster
 
 Depois do login, um comando devolve tudo com usuário e senha:
