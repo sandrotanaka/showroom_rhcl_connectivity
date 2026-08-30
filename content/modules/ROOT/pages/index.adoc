@@ -70,6 +70,8 @@ bash ~/workshop/scripts/workshop.sh lista
 | `verifica <n>` | confere as tarefas do módulo. Não muda nada.
 | `corrige <n>` | devolve o módulo ao estado **inicial**, para refazer.
 | `pula <n>` | aplica o estado **final**, para quem vai pular aquela parte.
+| `status` | a trilha inteira, com o que já passou — e onde você está.
+| `proximo` | verifica o módulo atual; se passou, anuncia o próximo.
 | `diagnostica <n>` | por que não passou: sintoma, causa provável e comando. Nunca falha.
 |===
 

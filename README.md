@@ -50,7 +50,16 @@ bash scripts/workshop.sh diagnostica 33    # por que não passou
 bash scripts/workshop.sh corrige 33        # devolve ao estado INICIAL
 bash scripts/workshop.sh pula 33           # aplica o estado FINAL (e o dos anteriores)
 bash scripts/workshop.sh diagnostica       # sem número: só as camadas de plataforma
+bash scripts/workshop.sh status            # a trilha inteira, com o que já passou
+bash scripts/workshop.sh proximo           # verifica onde está; passou, anuncia o próximo
 ```
+
+`status` e `proximo` guardam o progresso em `$HOME/.workshop-progresso` — que no
+Showroom é PVC, então sobrevive a F5, reconexão do terminal e restart do pod. Um
+módulo só entra na lista quando a **verificação passa**, nunca por ter sido
+aberto: o `status` responde *"o que eu fiz"*, não *"onde eu cliquei"*. E o
+`proximo` **não avança** com a verificação falhando — um wizard que avança ensina
+a ignorar a verificação.
 
 `corrige` e `pula` têm alvos **opostos** — início e fim — e por isso são dois
 arquivos, não um com flag. Um `solve` usado como conserto pula o aprendizado sem

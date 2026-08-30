@@ -104,6 +104,33 @@ No módulo xref:16-t1-rbac.adoc[1.6] você vai descobrir que, neste cluster, ess
 identidade pode tudo — e que é justamente por isso que aquele módulo usa
 impersonação para mostrar o que uma função *limitada* poderia fazer.
 
+== Perdeu o lugar no roteiro
+
+O progresso fica no seu `$HOME`, que é volume persistente: sobrevive a
+recarregar a página, reconectar o terminal e reiniciar o pod.
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh status
+----
+
+Mostra os 20 módulos, marca os que já passaram e aponta onde você está. Para
+seguir dali:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh proximo
+----
+
+Ele verifica o módulo atual. Passou, registra e anuncia o próximo; **não passou,
+não avança** — chama o diagnóstico e você continua no mesmo módulo.
+
+[NOTE]
+====
+Um módulo só entra na lista quando a *verificação* passa, nunca por ter sido
+aberto. O `status` responde "o que eu fiz", e não "onde eu cliquei".
+====
+
 == O que fazer quando um endereço não responde
 
 Antes de investigar, pergunte se o serviço existe:
