@@ -1,42 +1,58 @@
 ---
-- name: "1.2 — a cadeia de suprimento executou e assinou"
+- name: "1.2 — o Argo governa, e o desvio foi devolvido"
   hosts: localhost
   connection: local
   gather_facts: false
   tasks:
-    - name: Tarefa 1 — houve PipelineRun na amostra
+    - name: "O ApplicationSet que gera as Applications"
       kubernetes.core.k8s_info:
-        api_version: tekton.dev/v1
-        kind: PipelineRun
+        api_version: argoproj.io/v1alpha1
+        kind: ApplicationSet
+        namespace: openshift-gitops
+      register: r_appset
+
+    - name: "As Applications geradas"
+      kubernetes.core.k8s_info:
+        api_version: argoproj.io/v1alpha1
+        kind: Application
+        namespace: openshift-gitops
+      register: r_apps
+
+    - name: "O desvio do exercicio 3 foi devolvido"
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: ratings-v1
         namespace: bookinfo
-      register: r_prs
-      ignore_errors: true
+      register: r_dep
 
-    - name: Consolidar
+    - name: "Consolidar"
       ansible.builtin.set_fact:
-        _runs: "{{ r_prs.resources | default([]) }}"
-    - name: Consolidar (2)
-      ansible.builtin.set_fact:
-        _ok: "{{ _runs | selectattr('status.conditions','defined')
-                 | selectattr('status.conditions.0.status','equalto','True') | list }}"
-        _assinadas: "{{ _runs | map(attribute='metadata.annotations') | select('defined')
-                        | selectattr('chains.tekton.dev/signed','defined') | list }}"
+        _preserva: "{{ r_appset.resources | default([])
+                       | selectattr('spec.syncPolicy.preserveResourcesOnDeletion','defined')
+                       | selectattr('spec.syncPolicy.preserveResourcesOnDeletion','equalto',true) | list }}"
+        _synced: "{{ r_apps.resources | default([]) | selectattr('status.sync.status','defined')
+                     | selectattr('status.sync.status','equalto','Synced') | list }}"
+        _replicas: "{{ r_dep.resources[0].spec.replicas | default(0) }}"
 
-    - name: Resultado
+    - name: "Resultado"
       ansible.builtin.assert:
         that:
-          - _runs | length > 0
-          - _ok | length > 0
-          - _assinadas | length > 0
+          - r_appset.resources | default([]) | length > 0
+          - _preserva | length > 0
+          - _synced | length > 0
+          - _replicas | int == 1
         success_msg: |
-          OK {{ _runs | length }} execucao(oes) da cadeia, {{ _ok | length }} bem-sucedida(s)
-          OK {{ _assinadas | length }} assinada(s) pelo Tekton Chains
+          OK ApplicationSet presente — Application nasce de repositorio, nao de manifesto escrito a mao
+          OK preserveResourcesOnDeletion ligado — apagar o Application nao derruba o servico vivo
+          OK {{ _synced | length }} Application(s) Synced
+          OK o desvio do exercicio 3 foi devolvido (ratings-v1 com 1 replica)
         fail_msg: |
-          {{ 'OK  ' if _runs | length > 0 else 'FALHOU' }} PipelineRun em bookinfo: {{ _runs | length }}
-          {{ 'OK  ' if _ok | length > 0 else 'FALHOU' }} alguma execucao bem-sucedida
-          {{ 'OK  ' if _assinadas | length > 0 else 'FALHOU' }} alguma execucao assinada
+          {{ 'OK  ' if r_appset.resources | default([]) | length > 0 else 'FALHOU' }} ApplicationSet em openshift-gitops
+          {{ 'OK  ' if _preserva | length > 0 else 'FALHOU' }} preserveResourcesOnDeletion
+          {{ 'OK  ' if _synced | length > 0 else 'FALHOU' }} alguma Application Synced
+          {{ 'OK  ' if _replicas | int == 1 else 'FALHOU' }} ratings-v1 com {{ _replicas }} replica(s), esperado 1
 
-          Dispare a cadeia:
-            cd ~/rhcl && DISPARA_BUILD=1 SAMPLES=bookinfo bash scripts/provision.sh samples
-          Sem anotacao de assinatura, o controller do Chains subiu antes da chave:
-            oc rollout restart deployment/tekton-chains-controller -n openshift-pipelines
+          selfHeal esta DESLIGADO aqui: o Argo detecta o desvio e nao o desfaz.
+          Quem devolve e voce:
+            oc scale deploy/ratings-v1 -n bookinfo --replicas=1

@@ -1,0 +1,194 @@
+= 1.2 OpenShift GitOps
+:navtitle: 1.2 OpenShift GitOps
+
+*Tempo: 30 minutos*
+
+No módulo anterior a aplicação subiu e você não digitou nenhum comando de deploy.
+Este módulo é sobre **quem digitou por você**, e sobre o que essa escolha custa e
+entrega.
+
+== Objetivos
+
+* Distinguir `Application` de `ApplicationSet`, e saber quando cada um serve.
+* Ler os dois estados que o Argo CD reporta — *sync* e *health* — e não confundi-los.
+* Provocar desvio de configuração e vê-lo detectado, com o diff.
+* Explicar por que `selfHeal` está desligado aqui, e o que muda quando ele liga.
+
+== Exercício 1: a interface
+
+. Abra o Argo CD:
++
+[source,role="execute"]
+----
+oc get route openshift-gitops-server -n openshift-gitops \
+  -o jsonpath='https://{.spec.host}{"\n"}'
+----
+
+. Entre com as credenciais do OpenShift (*Log in via OpenShift*).
+
+. Na tela inicial, cada cartão é uma `Application`. Repare que há **duas
+  informações diferentes** em cada uma:
++
+[cols="1,3"]
+|===
+| *Sync* | o cluster está igual ao Git? (`Synced` / `OutOfSync`)
+| *Health* | o que está no cluster está saudável? (`Healthy` / `Degraded` / `Progressing`)
+|===
+
+Os dois são independentes, e confundi-los é o erro mais comum de quem começa:
+uma aplicação pode estar `Synced` e `Degraded` — o Git foi aplicado fielmente, e o
+que estava no Git está quebrado. E pode estar `OutOfSync` e `Healthy` — alguém
+editou o cluster à mão, e funcionou.
+
+== Exercício 2: quem criou essas Applications
+
+. Nenhuma delas foi criada por alguém. Veja o gerador:
++
+[source,role="execute"]
+----
+oc get applicationset -n openshift-gitops
+oc get applicationset rhcl-samples -n openshift-gitops -o jsonpath='{.spec.generators}' | python3 -m json.tool
+----
+
+O gerador varre um grupo do GitLab e cria **uma `Application` por repositório
+encontrado**. Adicionar uma aplicação nova à plataforma passou a ser criar um
+repositório — não editar um manifesto de Argo.
+
+. Repare no filtro:
++
+----
+filters:
+  - pathsExist: [manifests]
+----
+
+[IMPORTANT]
+====
+Duas armadilhas deste gerador, que já custaram ambiente neste projeto:
+
+*O `include: manifests/[0-9]*.yaml` é contrato.* Renomear um manifesto para algo
+que não comece com dígito o tira do Argo **em silêncio** — sem erro, sem aviso, e
+o objeto continua no cluster porque `prune` está desligado.
+
+*`cloneProtocol: https` é obrigatório.* Sem ele o default é SSH, o Argo pede um
+agente que não existe, e **nenhuma** `Application` sincroniza — enquanto o
+`ApplicationSet` reporta `ErrorOccurred=False` e "all applications have been
+generated successfully".
+====
+
+== Exercício 3: provocar desvio
+
+. Edite um objeto vivo, à mão, como alguém faria numa madrugada:
++
+[source,role="execute"]
+----
+oc scale deploy/ratings-v1 -n bookinfo --replicas=2
+----
+
+. Volte ao Argo CD e olhe a `Application` da amostra. Em segundos ela fica
+  **`OutOfSync`**.
+
+. Clique em *App Diff*. O Argo mostra exatamente o que difere entre o Git e o
+  cluster — não "algo mudou", mas qual campo, qual valor antes, qual depois.
+
+. Devolva ao estado do Git, pelo botão *Sync* ou pela linha de comando:
++
+[source,role="execute"]
+----
+oc scale deploy/ratings-v1 -n bookinfo --replicas=1
+----
+
+== Exercício 4: por que `selfHeal` está desligado
+
+. Veja a política de sincronização:
++
+[source,role="execute"]
+----
+oc get applicationset rhcl-samples -n openshift-gitops \
+  -o jsonpath='{.spec.template.spec.syncPolicy}' | python3 -m json.tool
+----
+
+[cols="1,3"]
+|===
+| `automated` | *ligado* — o que entra no Git é aplicado sozinho
+| `selfHeal` | *desligado* — o Argo detecta o desvio e **não** o desfaz
+| `prune` | *desligado* — objetos removidos do Git não são apagados do cluster
+|===
+
+Ligar `selfHeal` transformaria o desvio do exercício anterior em algo que se
+desfaz em segundos. Isso é excelente em produção — e é **exatamente por isso**
+que ele está desligado aqui: os módulos das trilhas 2 e 3 editam policies ao
+vivo, e sob *enforcement* o Argo desfaria o movimento no meio da explicação.
+
+[WARNING]
+====
+`prune: false` também tem motivo, e ele é sobre convivência: quando duas coisas
+aplicam os mesmos manifestos — aqui, o Argo e o provisionador — `prune` apagaria
+do cluster o que a outra acabou de criar, sempre que uma delas ficasse para trás.
+====
+
+== Exercício 5: a lição que custou serviço no ar
+
+. Procure este campo:
++
+[source,role="execute"]
+----
+oc get applicationset rhcl-samples -n openshift-gitops \
+  -o jsonpath='{.spec.syncPolicy}{"\n"}'
+----
+
+. Você deve ver `preserveResourcesOnDeletion: true`.
+
+Por padrão, o `ApplicationSet` carimba um *finalizer* em cada `Application` que
+gera — e **apagar a `Application` apaga do cluster o que ela observa**. Neste
+projeto foi assim que um Deployment e um Service caíram: alguém recriou as
+`Application` para trocar a política de sincronização, e o serviço vivo foi junto.
+
+O risco não é hipotético nem raro: basta alguém renomear um diretório para o
+gerador apagar a `Application` antiga sozinho, sem avisar.
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 12
+----
+
+.Se falhar
+[%collapsible]
+====
+*A `Application` não voltou a `Synced`?* Force a sincronização e veja o motivo:
+
+[source,role="execute"]
+----
+oc get application -n openshift-gitops -o custom-columns='NOME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status'
+----
+
+*Ficou com 2 réplicas?* O `selfHeal` está desligado — o Argo detecta e não
+conserta. É você quem devolve:
+
+[source,role="execute"]
+----
+oc scale deploy/ratings-v1 -n bookinfo --replicas=1
+----
+====
+
+== O que isso significa
+
+GitOps não é "usar Git para deploy" — isso qualquer pipeline faz. É ter um
+**estado desejado declarado** e um controlador que compara continuamente com o
+real, reportando a diferença.
+
+Os três verbos do Argo mapeiam três decisões organizacionais distintas, e vale
+tomar cada uma conscientemente:
+
+[cols="1,3"]
+|===
+| `automated` | quem faz merge, publica
+| `selfHeal` | edição no cluster é erro a ser corrigido, ou intervenção legítima?
+| `prune` | remover do Git é ordem de apagar, ou só de parar de gerenciar?
+|===
+
+Neste ambiente as três respostas são deliberadas, e você acabou de ler cada uma
+no objeto.
+
+Siga para xref:13-t1-pipelines.adoc[Módulo 1.3].

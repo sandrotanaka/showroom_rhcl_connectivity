@@ -1,5 +1,5 @@
-= 1.3 Trocar a origem das imagens
-:navtitle: 1.3 Trocar a origem
+= 1.5 Trocar a origem das imagens
+:navtitle: 1.5 Trocar a origem
 
 *Tempo: 15 minutos*
 

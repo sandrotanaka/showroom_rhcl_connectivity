@@ -1,0 +1,17 @@
+---
+# 1.2 CORRIGE: devolve o desvio provocado no exercicio 3.
+- name: "1.2 — corrige (sem desvio)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Devolver ratings-v1 a uma replica"
+      kubernetes.core.k8s:
+        state: patched
+        api_version: apps/v1
+        kind: Deployment
+        name: ratings-v1
+        namespace: bookinfo
+        definition:
+          spec:
+            replicas: 1

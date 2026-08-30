@@ -1,53 +1,36 @@
 ---
-# 1.3 PULA: aponta a origem das imagens para a copia assinada no Quay.
-#
-# O host do Quay e DESCOBERTO do cluster. Escrever um host em arquivo faria o
-# playbook envelhecer junto com o cluster, que e efemero.
-- name: "1.3 — pula (origem no Quay do cluster)"
+# 1.3 PULA: dispara uma execucao de valida-policies e espera terminar.
+- name: "1.3 — pula (uma execucao concluida)"
   hosts: localhost
   connection: local
   gather_facts: false
-  vars:
-    kust: "{{ lookup('env','HOME') }}/rhcl/samples/bookinfo/kustomization.yaml"
   tasks:
-    - name: "Descobrir o host do Quay"
-      ansible.builtin.shell: |
-        set -o pipefail
-        oc get route -A -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.host}{"\n"}{end}' \
-          | grep -i quay | awk '{print $2}' | head -1
-      args: {executable: /bin/bash}
-      register: r_quay
-      changed_when: false
-      failed_when: r_quay.stdout | trim | length == 0
+    - name: "Criar a PipelineRun"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: tekton.dev/v1
+          kind: PipelineRun
+          metadata:
+            generateName: valida-policies-run-
+            namespace: travel-agency
+          spec:
+            pipelineRef: {name: valida-policies}
+            workspaces:
+              - name: fonte
+                volumeClaimTemplate:
+                  spec:
+                    accessModes: [ReadWriteOnce]
+                    resources: {requests: {storage: 1Gi}}
+      register: r_run
 
-    - name: "Descomentar o bloco images: e apontar para o Quay"
-      ansible.builtin.shell: |
-        set -o pipefail
-        sed -i \
-          -e 's|^#\( *images:\)|\1|' \
-          -e 's|^#\( *- name: registry\.istio\.io.*\)|\1|' \
-          -e 's|^#\( *newName: \).*|\1{{ r_quay.stdout | trim }}/rhcl/PLACEHOLDER|' \
-          "{{ kust }}"
-        # o newName correto e derivado do name da linha anterior
-        python3 - "{{ kust }}" "{{ r_quay.stdout | trim }}" <<'PY'
-        import sys, re
-        caminho, quay = sys.argv[1], sys.argv[2]
-        linhas = open(caminho).read().split('\n')
-        ultimo = None
-        for i, l in enumerate(linhas):
-            m = re.match(r'^(\s*)- name: (\S+)', l)
-            if m: ultimo = m.group(2)
-            if 'newName:' in l and ultimo:
-                indent = l[:len(l) - len(l.lstrip())]
-                linhas[i] = f"{indent}newName: {quay}/rhcl/{ultimo.rsplit('/', 1)[-1]}"
-        open(caminho, 'w').write('\n'.join(linhas))
-        PY
-      args: {executable: /bin/bash}
-      changed_when: true
-
-    - name: "Reaplicar a amostra"
-      ansible.builtin.command:
-        cmd: bash scripts/provision.sh samples
-        chdir: "{{ lookup('env','HOME') }}/rhcl"
-      environment: {SAMPLES: bookinfo}
-      changed_when: true
+    - name: "Esperar a execucao terminar"
+      kubernetes.core.k8s_info:
+        api_version: tekton.dev/v1
+        kind: PipelineRun
+        namespace: travel-agency
+        name: "{{ r_run.result.metadata.name }}"
+      register: r_pr
+      until: r_pr.resources[0].status.completionTime is defined
+      retries: 30
+      delay: 10

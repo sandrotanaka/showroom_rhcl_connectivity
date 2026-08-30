@@ -1,0 +1,203 @@
+= 1.3 OpenShift Pipelines
+:navtitle: 1.3 OpenShift Pipelines
+
+*Tempo: 30 minutos*
+
+O Argo aplica o que está no Git. Alguém precisa decidir **o que merece entrar no
+Git** — e provar que merece. Essa é a outra metade da plataforma.
+
+== Objetivos
+
+* Nomear as peças do modelo do Tekton e como elas se encaixam.
+* Executar uma pipeline, acompanhar a execução e ler os logs por tarefa.
+* Fazer um portão de qualidade **reprovar**, de propósito.
+* Explicar o que são *workspaces* e *results*, e por que eles existem.
+
+== Exercício 1: o modelo, em quatro nomes
+
+[cols="1,3"]
+|===
+| `Task` | uma unidade de trabalho, com *steps*. Cada step é um contêiner.
+| `Pipeline` | a ordem entre `Task`, com dependências declaradas
+| `PipelineRun` | **uma execução**. É o objeto que você cria para rodar algo.
+| `TaskRun` | uma execução de `Task`, criada pelo `PipelineRun`. Cada uma vira um pod.
+|===
+
+. Veja as pipelines que existem no cluster:
++
+[source,role="execute"]
+----
+oc get pipeline -A
+----
+
+Repare que elas moram **no namespace da aplicação**, e não num namespace de CI
+comum. Isso não é arrumação: o plugin do portal enxerga as execuções pelo seletor
+da entidade dentro do namespace dela — com a pipeline em outro lugar, a aba *CI*
+do componente abre vazia.
+
+== Exercício 2: executar
+
+A pipeline `valida-policies` confere propriedades do YAML renderizado. Ela não
+precisa de cluster nem de RBAC, e roda em segundos — é a melhor para ver o modelo
+inteiro funcionando.
+
+. Dispare uma execução:
++
+[source,role="execute"]
+----
+oc create -f - <<'YAML'
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: valida-policies-run-
+  namespace: travel-agency
+spec:
+  pipelineRef: {name: valida-policies}
+  workspaces:
+    - name: fonte
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources: {requests: {storage: 1Gi}}
+YAML
+----
+
+. Acompanhe as `TaskRun` nascendo:
++
+[source,role="execute"]
+----
+oc get taskrun -n travel-agency -w
+----
++
+Saia com `Ctrl-C` quando terminar.
+
+. Cada `TaskRun` é um pod. Veja:
++
+[source,role="execute"]
+----
+oc get pods -n travel-agency -l tekton.dev/pipelineRun --sort-by=.metadata.creationTimestamp | tail -5
+----
+
+. E os logs, por tarefa:
++
+[source,role="execute"]
+----
+oc logs -n travel-agency -l tekton.dev/pipelineTask=renderiza --tail=30
+----
+
+[TIP]
+====
+No console, *Pipelines* → *PipelineRuns* mostra a mesma execução como grafo, com
+os logs por tarefa. E no portal, a aba *CI* do componente mostra as execuções
+daquela aplicação — mesma informação, público diferente.
+====
+
+== Exercício 3: workspaces e results
+
+Duas peças do modelo respondem a perguntas que toda pipeline tem:
+
+[cols="1,3"]
+|===
+| *workspace* | *como a tarefa 2 vê o que a tarefa 1 baixou?* Cada `TaskRun` é um pod diferente — sem um volume compartilhado, o `git clone` da primeira tarefa não existe para a segunda.
+| *result* | *como a tarefa 2 recebe um valor da tarefa 1?* Um `result` é uma string curta que sai de uma tarefa e entra nos parâmetros de outra — o *commit* clonado, o digest da imagem publicada.
+|===
+
+. Veja os dois na pipeline que compila de verdade:
++
+[source,role="execute"]
+----
+sed -n '/^  workspaces:/,/^  tasks:/p' ~/rhcl/platform-reference/pipelines/build-travel-packages.yaml
+----
+
+. E os dois `results` da pipeline inteira:
++
+[source,role="execute"]
+----
+grep -A6 '^  results:' ~/rhcl/platform-reference/pipelines/build-travel-packages.yaml
+----
+
+`IMAGE_URL` e `IMAGE_DIGEST` não são enfeite: é por eles que o **Tekton Chains**
+descobre o que assinar. Uma pipeline que publica imagem e não declara esses
+results produz artefato sem assinatura — e ninguém recebe erro.
+
+== Exercício 4: fazer o portão reprovar
+
+Um portão que nunca reprova não é portão. Prove que este reprova.
+
+. A pipeline confere três propriedades que já custaram ambiente neste projeto —
+  entre elas, uma `AuthPolicy` escrita com `spec.defaults.rules` em vez de
+  `spec.rules`, que fica `Accepted=True`, `Enforced=False`, e **nenhuma chave
+  funciona**.
+
+. Introduza o defeito numa cópia local e rode a mesma checagem que a tarefa faz:
++
+[source,role="execute"]
+----
+cd ~/rhcl && sed -n '/O QUE ELA CONFERE/,/^#$/p' platform-reference/pipelines/valida-policies.yaml
+----
+
+. As três checagens compartilham o mesmo modo de falhar: a policy fica aceita, o
+  caminho de dados continua respondendo `200`, e ninguém percebe **até o palco**.
+  É por isso que elas viraram portão de pipeline, e não item de checklist.
+
+== Exercício 5: o que esta plataforma não usa, e por quê
+
+. Procure `ClusterTask` ou referência a catálogo remoto:
++
+[source,role="execute"]
+----
+grep -c 'taskSpec' ~/rhcl/platform-reference/pipelines/build-travel-packages.yaml
+grep -c 'taskRef' ~/rhcl/platform-reference/pipelines/build-travel-packages.yaml || true
+----
+
+Tudo é `taskSpec` **inline**. Não é preferência de estilo: as `ClusterTask` foram
+removidas no OpenShift Pipelines recente, e uma pipeline que depende de resolver
+tarefa remota falha num cluster sem saída para a internet — **com uma mensagem
+sobre o resolver, e não sobre o build**. Quem for depurar procura no lugar errado.
+
+== Verificação
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 13
+----
+
+.Se falhar
+[%collapsible]
+====
+*A `PipelineRun` ficou `Pending`?* Normalmente é o *workspace*: o
+`volumeClaimTemplate` precisa de uma StorageClass que atenda `ReadWriteOnce`.
+
+[source,role="execute"]
+----
+oc get pvc -n travel-agency
+oc get storageclass
+----
+
+*A execução falhou na primeira tarefa?* Ela clona um repositório — veja o log:
+
+[source,role="execute"]
+----
+oc logs -n travel-agency -l tekton.dev/pipelineTask=renderiza --tail=40
+----
+====
+
+== O que isso significa
+
+Pipelines e GitOps respondem a perguntas diferentes, e a plataforma precisa das
+duas:
+
+[cols="1,3"]
+|===
+| *Pipelines* | isto **merece** entrar? — compila, testa, analisa, varre, assina
+| *GitOps* | o que foi aprovado **está** aplicado? — compara e reporta continuamente
+|===
+
+A fronteira entre elas é o repositório. A pipeline termina abrindo um *pull
+request* ou publicando um artefato; o Argo começa a partir do que foi mesclado.
+Nenhuma das duas alcança o cluster sem passar pela outra — e é essa separação que
+faz a pergunta *"quem pode mudar produção?"* ter uma resposta curta.
+
+No próximo módulo as duas trabalham juntas sobre a aplicação do dia.
+
+Siga para xref:14-t1-procedencia.adoc[Módulo 1.4].

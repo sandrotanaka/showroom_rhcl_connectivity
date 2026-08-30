@@ -1,37 +1,52 @@
 ---
-- name: "1.3 — os pods rodam a copia assinada"
+- name: "1.3 — o modelo do Tekton foi exercitado"
   hosts: localhost
   connection: local
   gather_facts: false
   tasks:
-    - name: Imagens em execucao
+    - name: "As pipelines do cluster"
       kubernetes.core.k8s_info:
-        api_version: v1
-        kind: Pod
-        namespace: bookinfo
-        field_selectors: [status.phase=Running]
-      register: r_pods
+        api_version: tekton.dev/v1
+        kind: Pipeline
+      register: r_pipes
+      ignore_errors: true
 
-    - name: Consolidar
-      ansible.builtin.set_fact:
-        _imagens: "{{ r_pods.resources | default([])
-                      | map(attribute='spec.containers') | map('first')
-                      | map(attribute='image') | list }}"
-    - name: Consolidar (2)
-      ansible.builtin.set_fact:
-        _upstream: "{{ _imagens | select('search','registry.istio.io') | list }}"
+    - name: "As execucoes de valida-policies"
+      kubernetes.core.k8s_info:
+        api_version: tekton.dev/v1
+        kind: PipelineRun
+        namespace: travel-agency
+      register: r_runs
+      ignore_errors: true
 
-    - name: Resultado
+    - name: "As TaskRun que elas criaram"
+      kubernetes.core.k8s_info:
+        api_version: tekton.dev/v1
+        kind: TaskRun
+        namespace: travel-agency
+      register: r_taskruns
+      ignore_errors: true
+
+    - name: "Consolidar"
+      ansible.builtin.set_fact:
+        _t1: "{{ r_pipes.resources | default([]) | length > 0 }}"
+        _t2: "{{ r_runs.resources | default([]) | length > 0 }}"
+        _t3: "{{ r_taskruns.resources | default([]) | length > 0 }}"
+
+    - name: "Resultado"
       ansible.builtin.assert:
-        that:
-          - _imagens | length > 0
-          - _upstream | length == 0
+        that: [_t1 | bool, _t2 | bool, _t3 | bool]
         success_msg: |
-          OK nenhuma imagem vem mais de registry.istio.io
-          OK origem atual: {{ _imagens | map('regex_replace','/.*','') | unique | join(' ') }}
+          OK {{ r_pipes.resources | length }} Pipeline no cluster
+          OK {{ r_runs.resources | length }} PipelineRun em travel-agency
+          OK {{ r_taskruns.resources | length }} TaskRun — cada uma virou um pod
         fail_msg: |
-          FALHOU {{ _upstream | length }} imagem(ns) ainda vem do upstream
+          {{ 'OK  ' if _t1 else 'FALHOU' }} Pipelines no cluster: {{ r_pipes.resources | default([]) | length }}
+          {{ 'OK  ' if _t2 else 'FALHOU' }} PipelineRun em travel-agency: {{ r_runs.resources | default([]) | length }}
+          {{ 'OK  ' if _t3 else 'FALHOU' }} TaskRun geradas: {{ r_taskruns.resources | default([]) | length }}
 
-          Descomente o bloco 'images:' em ~/rhcl/samples/bookinfo/kustomization.yaml
-          e aponte para o Quay deste cluster, depois reaplique:
-            cd ~/rhcl && SAMPLES=bookinfo bash scripts/provision.sh samples
+          Sem CRD de Tekton, o OpenShift Pipelines nao esta instalado:
+            oc get crd pipelineruns.tekton.dev
+          PipelineRun presa em Pending costuma ser o workspace -- o
+          volumeClaimTemplate precisa de uma StorageClass ReadWriteOnce:
+            oc get pvc -n travel-agency

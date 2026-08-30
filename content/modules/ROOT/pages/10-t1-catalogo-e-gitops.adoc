@@ -1,5 +1,5 @@
-= 1.1 O catálogo e o GitOps
-:navtitle: 1.1 Catálogo e GitOps
+= 1.1 O catálogo e o repositório
+:navtitle: 1.1 Catálogo e repositório
 
 *Tempo: 25 minutos*
 
@@ -132,4 +132,4 @@ vêm de `registry.istio.io`, um registry de terceiro, sem varredura e sem
 assinatura — exatamente o que a maioria das organizações põe em produção sem
 pensar. É o assunto do próximo módulo.
 
-Siga para xref:11-t1-procedencia.adoc[Módulo 1.2].
+Siga para xref:12-t1-gitops.adoc[Módulo 1.2].
