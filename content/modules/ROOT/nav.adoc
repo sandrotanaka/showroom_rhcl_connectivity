@@ -1,6 +1,7 @@
 * xref:index.adoc[Boas-vindas]
 * xref:01-visao-geral.adoc[Visão geral]
 * xref:02-ambiente.adoc[Seu ambiente]
+* xref:03-acessos.adoc[Acessos]
 * Trilha 1 — Do repositório ao cluster
 ** xref:10-t1-catalogo-e-gitops.adoc[1.1 O catálogo e o repositório]
 ** xref:12-t1-gitops.adoc[1.2 OpenShift GitOps]

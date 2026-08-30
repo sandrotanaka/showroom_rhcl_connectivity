@@ -126,4 +126,10 @@ Você não instalou plataforma nenhuma — ela já estava aqui, e é isso que fa
 plataforma. O que você vai fazer no resto do dia é **usá-la**, três vezes, para
 três perguntas diferentes sobre a mesma aplicação.
 
+[TIP]
+====
+A xref:03-acessos.adoc[folha de acessos] tem todo endereço e toda senha deste
+cluster, descobertos na hora. Volte a ela quando precisar — não decore nada.
+====
+
 Siga para xref:10-t1-catalogo-e-gitops.adoc[Trilha 1, módulo 1].
