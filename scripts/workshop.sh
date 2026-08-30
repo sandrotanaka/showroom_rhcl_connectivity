@@ -140,10 +140,16 @@ EOF
 # O callback 'debug' e o que renderiza msg multilinha. Sem ele o Ansible imprime
 # o relatorio como string JSON com \n escapado -- ilegivel exatamente no momento
 # em que a pessoa mais precisa ler.
-# 'community.general.yaml' renderiza msg multilinha; o 'debug' NAO existe mais
-# no ansible-core 2.21 (medido no terminal: so default, junit, minimal, oneline
-# e tree). Por isso instalamos o pacote 'ansible' completo, e nao o core pelado.
-export ANSIBLE_STDOUT_CALLBACK=community.general.yaml
+# COMO SE FAZ O RELATORIO SAIR LEGIVEL, em 2026: callback 'default' com
+# result_format=yaml. Sem isso o Ansible imprime msg multilinha como string JSON
+# com \n escapado -- ilegivel no momento em que a pessoa mais precisa ler.
+#
+# Duas tentativas anteriores morreram, e as duas so aparecem no ambiente real:
+# o callback 'debug' foi removido do ansible-core 2.21, e o
+# 'community.general.yaml' foi removido da collection na versao 12. O proprio
+# erro do segundo aponta para esta opcao.
+export ANSIBLE_STDOUT_CALLBACK=default
+export ANSIBLE_CALLBACK_RESULT_FORMAT=yaml
 export ANSIBLE_DISPLAY_SKIPPED_HOSTS=false
 
 # O TEMPORARIO PRECISA SAIR DE '~', E NAO E FRESCURA.
