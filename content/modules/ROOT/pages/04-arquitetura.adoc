@@ -61,7 +61,7 @@ declaração, e você vai ver um vizinho do mesmo namespace ser recusado.
 
 Uma chamada a `/productpage` percorre isto:
 
-[source,subs="attributes"]
+[source]
 ----
 navegador
   └─ gateway (Envoy)            <1>
@@ -75,9 +75,11 @@ navegador
     tempo medido.
 <2> a única resposta que o navegador enxerga; monta a página com o que os outros
     devolverem.
-<3> e <4> saem **em paralelo**. Se um falhar, o `productpage` ainda responde.
-<5> a decisão de qual versão do `reviews` recebe a chamada não está no código
-    nem no deploy: está num peso, fora dos dois.
+<3> sai em paralelo com o próximo. Se falhar, o `productpage` ainda responde.
+<4> a decisão de qual versão recebe a chamada não está no código nem no deploy:
+    está num peso, fora dos dois.
+<5> ponta da cadeia. É a ele que o módulo 2.5 injeta falha, para ver a página
+    degradar sem quebrar.
 
 [NOTE]
 ====
