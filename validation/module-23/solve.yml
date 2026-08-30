@@ -1,0 +1,23 @@
+---
+# 2.3 PULA: o estado final deste modulo e "ha trafego coletado". Sem isso o
+# grafo abre vazio e o modulo seguinte mede o nada.
+- name: "2.3 — pula (metricas coletadas)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Descobrir o dominio"
+      kubernetes.core.k8s_info: {api_version: config.openshift.io/v1, kind: Ingress, name: cluster}
+      register: r_ing
+
+    - name: "Gerar carga pela borda"
+      ansible.builtin.shell: |
+        for i in $(seq 1 120); do
+          curl -sk -o /dev/null "https://bookinfo.{{ r_ing.resources[0].spec.domain }}/productpage"
+        done
+      args: {executable: /bin/bash}
+      changed_when: true
+      failed_when: false
+
+    - name: "Esperar a raspagem"
+      ansible.builtin.pause: {seconds: 60}

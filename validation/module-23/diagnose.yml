@@ -1,0 +1,32 @@
+---
+# Diagnostico do modulo 23 -- Observabilidade
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 23 Observabilidade"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "ServiceMonitor e PodMonitor do Service Mesh"
+      ansible.builtin.command: oc get servicemonitor,podmonitor -A --no-headers
+      register: m_mon
+      changed_when: false
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 23 — Observabilidade
+          ===========================================================
+          {% if (m_mon.stdout | default('')) | length == 0 %}
+          [!] Nenhum monitor: o user workload monitoring nao esta raspando nada, e o
+              grafo fica vazio sem acusar erro.
+          {% else %}
+          [ ] Monitores presentes ({{ m_mon.stdout_lines | length }} linhas).
+          {% endif %}
+          [ ] Grafo vazio quase sempre e JANELA, nao coleta: a janela e de 5 minutos e a
+              raspagem leva ate um minuto. Gere carga e espere antes de investigar.
+                bash ~/workshop/scripts/workshop.sh pula 23
+          [ ] Os manifestos NAO tem a anotacao prometheus.io/scrape do upstream. Aqui
+              quem raspa e o ServiceMonitor -- procurar a anotacao e pista falsa.
+          ===========================================================

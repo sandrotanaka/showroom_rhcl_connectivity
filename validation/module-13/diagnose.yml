@@ -1,0 +1,42 @@
+---
+# Diagnostico do modulo 13 -- OpenShift Pipelines
+#
+# Roda o diagnostico de plataforma primeiro (as camadas de baixo explicam a
+# maioria dos sintomas) e depois olha o que ESTE modulo pressupoe.
+# Nunca falha: e um relatorio, nao uma afirmacao.
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 13 OpenShift Pipelines"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Execucoes e seus estados"
+      kubernetes.core.k8s_info: {api_version: tekton.dev/v1, kind: PipelineRun, namespace: travel-agency}
+      register: m_runs
+      failed_when: false
+
+    - name: "PVC dos workspaces"
+      kubernetes.core.k8s_info: {api_version: v1, kind: PersistentVolumeClaim, namespace: travel-agency}
+      register: m_pvc
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 13 — OpenShift Pipelines
+          ===========================================================
+          {% for r in m_runs.resources | default([]) %}
+          {{ r.metadata.name }}: {{ (r.status.conditions | default([{}]))[0].reason | default('em curso') }}
+          {% endfor %}
+          {% set pend = m_pvc.resources | default([]) | rejectattr('status.phase','equalto','Bound') | list %}
+          {% if pend | length > 0 %}
+          [!] PVC nao vinculado: {{ pend | map(attribute='metadata.name') | join(', ') }}
+              Execucao presa em Pending quase sempre e o workspace: o volumeClaimTemplate
+              precisa de uma StorageClass que atenda ReadWriteOnce.
+                oc get storageclass
+          {% endif %}
+          [ ] Tudo aqui e taskSpec inline. Uma pipeline que depende de resolver tarefa
+              remota falha com mensagem sobre o RESOLVER, nao sobre o build -- e quem
+              depura procura no lugar errado.
+          ===========================================================

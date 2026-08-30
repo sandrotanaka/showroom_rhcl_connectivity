@@ -1,0 +1,47 @@
+---
+# Diagnostico do modulo 15 -- Trocar a origem das imagens
+#
+# Roda o diagnostico de plataforma primeiro (as camadas de baixo explicam a
+# maioria dos sintomas) e depois olha o que ESTE modulo pressupoe.
+# Nunca falha: e um relatorio, nao uma afirmacao.
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 15 Trocar a origem das imagens"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Imagens em execucao"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: bookinfo
+        field_selectors: [status.phase=Running]
+      register: m_pods
+      failed_when: false
+
+    - name: "Eventos recentes de pull"
+      ansible.builtin.command: oc get events -n bookinfo --field-selector reason=Failed --no-headers
+      register: m_ev
+      changed_when: false
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 15 — Trocar a origem das imagens
+          ===========================================================
+          {% set imgs = m_pods.resources | default([]) | map(attribute='spec.containers') | map('first') | map(attribute='image') | list %}
+          origens: {{ imgs | map('regex_replace','/.*','') | unique | join(', ') | default('nenhuma') }}
+          {% if imgs | select('search','registry.istio.io') | list | length > 0 %}
+          [ ] Ainda no upstream. A troca e no bloco images: do kustomization -- o
+              Deployment nao muda, a substituicao acontece na renderizacao.
+          {% endif %}
+          {% if (m_ev.stdout | default('')) | length > 0 %}
+          [!] Falha de pull recente:
+              {{ m_ev.stdout | truncate(200) }}
+              Ou o cluster nao tem credencial para o registry interno, ou a etapa de
+              espelho nao copiou aquela imagem. Para seguir o workshop:
+                bash ~/workshop/scripts/workshop.sh corrige 15
+          {% endif %}
+          ===========================================================

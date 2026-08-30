@@ -1,0 +1,15 @@
+---
+# 02 CORRIGE -- nao ha estado do modulo a restaurar; o que existe e o cluster.
+- name: "02 — corrige (nada a restaurar)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Explicar"
+      ansible.builtin.debug:
+        msg: |
+          Este modulo nao altera o cluster: ele so entra, clona e confere.
+          Nao ha estado a restaurar.
+
+          Se o que voce quer e comecar a aplicacao do zero:
+            bash ~/workshop/scripts/workshop.sh corrige 11

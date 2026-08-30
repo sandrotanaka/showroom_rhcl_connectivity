@@ -1,0 +1,24 @@
+---
+# 02 PULA -- este modulo e pre-requisito, nao estado a aplicar. O que da para
+# fazer por voce e conferir a plataforma; clonar repositorio e logar sao seus.
+- name: "02 — pula (conferir a plataforma)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Rodar o verificador da plataforma"
+      ansible.builtin.command:
+        cmd: bash scripts/preflight.sh core
+        chdir: "{{ lookup('env','HOME') }}/rhcl"
+      register: r_pre
+      changed_when: false
+      failed_when: false
+
+    - name: "Resultado"
+      ansible.builtin.debug:
+        msg: |
+          {{ r_pre.stdout | default('') | truncate(2000) }}
+
+          Nao ha estado a aplicar neste modulo: entrar no cluster e clonar os
+          repositorios sao seus. Se o verificador acusou falta, cada linha traz
+          a correcao ao lado.

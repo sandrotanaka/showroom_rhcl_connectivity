@@ -1,0 +1,35 @@
+---
+# 1.3 CORRIGE: remove as execucoes do exercicio (e os PVC que elas criaram).
+#
+# Execucao concluida nao "desfaz" -- ela ja aconteceu. O que se restaura e o
+# namespace limpo, para o exercicio comecar de novo sem confusao de qual run
+# e qual.
+- name: "1.3 — corrige (sem execucoes de exercicio)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Listar as execucoes"
+      kubernetes.core.k8s_info:
+        api_version: tekton.dev/v1
+        kind: PipelineRun
+        namespace: travel-agency
+      register: r_runs
+      failed_when: false
+
+    - name: "Remover as execucoes de valida-policies"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: tekton.dev/v1
+        kind: PipelineRun
+        namespace: travel-agency
+        name: "{{ item.metadata.name }}"
+      loop: "{{ r_runs.resources | default([]) | selectattr('metadata.name','search','valida-policies') | list }}"
+      loop_control: {label: "{{ item.metadata.name }}"}
+
+    - name: "Aviso sobre os volumes"
+      ansible.builtin.debug:
+        msg: |
+          Execucoes removidas. Os PVC criados pelos workspaces podem sobrar --
+          confira e apague se estiverem ocupando espaco:
+            oc get pvc -n travel-agency

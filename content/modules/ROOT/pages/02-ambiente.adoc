@@ -54,6 +54,7 @@ bash ~/workshop/scripts/workshop.sh lista
 | `verifica <n>` | confere as tarefas do módulo. Não muda nada.
 | `corrige <n>` | devolve o módulo ao estado **inicial** — para quem quebrou algo e quer refazer.
 | `pula <n>` | aplica o estado **final** — para quem não vai fazer aquela parte. É cumulativo.
+| `diagnostica <n>` | por que não passou: sintoma, causa provável e comando. Nunca falha.
 |===
 
 `corrige` e `pula` têm alvos opostos: início e fim. Se você usar `pula` para

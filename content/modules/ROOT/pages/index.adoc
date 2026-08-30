@@ -70,6 +70,7 @@ bash ~/workshop/scripts/workshop.sh lista
 | `verifica <n>` | confere as tarefas do módulo. Não muda nada.
 | `corrige <n>` | devolve o módulo ao estado **inicial**, para refazer.
 | `pula <n>` | aplica o estado **final**, para quem vai pular aquela parte.
+| `diagnostica <n>` | por que não passou: sintoma, causa provável e comando. Nunca falha.
 |===
 
 Comece por xref:02-ambiente.adoc[Seu ambiente].

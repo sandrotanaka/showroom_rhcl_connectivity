@@ -1,0 +1,34 @@
+---
+# Diagnostico do modulo 36 -- A policy nasce com o servico
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 36 A policy nasce com o servico"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Applications no Argo"
+      kubernetes.core.k8s_info: {api_version: argoproj.io/v1alpha1, kind: Application, namespace: openshift-gitops}
+      register: m_apps
+      failed_when: false
+    - name: "ApplicationSet do golden path"
+      kubernetes.core.k8s_info: {api_version: argoproj.io/v1alpha1, kind: ApplicationSet, namespace: openshift-gitops}
+      register: m_appset
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 36 — A policy nasce com o servico
+          ===========================================================
+          ApplicationSet: {{ m_appset.resources | default([]) | map(attribute='metadata.name') | join(', ') | default('nenhum') }}
+          Applications: {{ m_apps.resources | default([]) | map(attribute='metadata.name') | join(', ') | default('nenhuma') }}
+          {% if (m_appset.resources | default([]) | length) == 0 %}
+          [!] Sem ApplicationSet, o template abre o PR e gera os manifests -- e nada
+              sincroniza. O repositorio novo nasce correto e o cluster nao fica sabendo.
+          {% endif %}
+          [ ] Repositorio criado e nada no cluster: confira o topic/subgrupo que o
+              gerador procura. Um repositorio fora do padrao e ignorado EM SILENCIO.
+          [ ] O template falhar ao criar o repositorio e credencial de Git, nao policy:
+                bash ~/rhcl/scripts/preflight.sh
+          ===========================================================

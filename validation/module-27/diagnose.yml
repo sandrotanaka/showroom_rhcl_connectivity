@@ -1,0 +1,40 @@
+---
+# Diagnostico do modulo 27 -- Canario
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 27 Canario"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "VirtualService de reviews"
+      kubernetes.core.k8s_info: {api_version: networking.istio.io/v1, kind: VirtualService, name: reviews, namespace: bookinfo}
+      register: m_vs
+      failed_when: false
+
+    - name: "Versoes no ar"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: bookinfo
+        label_selectors: [app=reviews]
+        field_selectors: [status.phase=Running]
+      register: m_pods
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 27 — Canario
+          ===========================================================
+          versoes no ar: {{ m_pods.resources | default([]) | map(attribute='metadata.labels.version') | select('defined') | unique | sort | join(', ') | default('nenhuma') }}
+          {% if (m_vs.resources | default([]) | length) > 0 %}
+          pesos: {{ m_vs.resources[0].spec.http[0].route | default([]) | map(attribute='weight') | join('/') }}
+          {% else %}
+          [!] Sem VirtualService, o balanceamento volta a ser por pod -- tres versoes,
+              ~33% cada. Nao e canario: e round-robin do Service.
+                bash ~/workshop/scripts/workshop.sh corrige 27
+          {% endif %}
+          [ ] Estrelas que nao mudam no navegador costumam ser cache. Meca pelo terminal,
+              que nao tem cache, antes de investigar a policy.
+          ===========================================================

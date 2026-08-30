@@ -1,0 +1,36 @@
+---
+# Diagnostico do modulo 31 -- A borda muda de dono
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 31 A borda muda de dono"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "HTTPRoutes do namespace"
+      kubernetes.core.k8s_info: {api_version: gateway.networking.k8s.io/v1, kind: HTTPRoute, namespace: bookinfo}
+      register: m_rotas
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 31 — A borda muda de dono
+          ===========================================================
+          {% for r in m_rotas.resources | default([]) %}
+          {{ r.metadata.name }} -> {{ r.spec.parentRefs[0].name | default('?') }}  hostnames: {{ r.spec.hostnames | default([]) | join(',') }}
+          {% endfor %}
+          {% set nomes = m_rotas.resources | default([]) | map(attribute='metadata.name') | list %}
+          {% if 'bookinfo' in nomes %}
+          [!] A rota do upstream ainda existe. Ela ja casa /api/v1/products: com as duas
+              camadas no ar, esse caminho passa SEM chave enquanto o resto passa com
+              chave. Uma API vendida com um caminho aberto por acidente e pior do que uma
+              API aberta, porque ninguem sabe.
+                oc delete httproute bookinfo -n bookinfo
+          {% endif %}
+          {% if m_rotas.resources | default([]) | selectattr('spec.hostnames','defined')
+             | map(attribute='spec.hostnames') | flatten | select('search','__DOMAIN__') | list | length > 0 %}
+          [!] Hostname com o literal __DOMAIN__: as rotas foram aplicadas com oc apply -k
+              em vez de passarem pela substituicao.
+          {% endif %}
+          ===========================================================

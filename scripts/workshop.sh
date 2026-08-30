@@ -3,12 +3,23 @@
 #
 # Tres verbos, tres alvos diferentes -- e a diferenca importa:
 #
-#   verifica <n>   afirma as tarefas do modulo. Nao muda nada.
-#   corrige  <n>   devolve o modulo ao estado INICIAL. Para quem quebrou algo
-#                  e quer refazer o exercicio.
-#   pula     <n>   aplica o estado FINAL do modulo. Para quem nao tem tempo ou
-#                  nao vai fazer aquela trilha -- os modulos seguintes
-#                  encontram o ambiente como se ele tivesse feito.
+#   verifica    <n>  afirma as tarefas do modulo. Nao muda nada.
+#   diagnostica <n>  olha as camadas de baixo e imprime sintoma, causa provavel
+#                    e comando. NUNCA falha -- falhar esconderia o relatorio.
+#   corrige     <n>  devolve o modulo ao estado INICIAL. Para quem quebrou algo
+#                    e quer refazer o exercicio.
+#   pula        <n>  aplica o estado FINAL do modulo. Para quem nao tem tempo ou
+#                    nao vai fazer aquela trilha -- os modulos seguintes
+#                    encontram o ambiente como se ele tivesse feito.
+#
+# POR QUE 'diagnostica' NAO E 'verifica' COM MAIS SAIDA: verificar responde
+# passou/nao passou e PRECISA falhar; diagnosticar responde por que, e precisa
+# imprimir tudo mesmo quando alguma consulta nao resolve. Juntar os dois daria
+# um comando que esconde metade do relatorio justamente no caso ruim.
+#
+# TODO MODULO RESPONDE AOS QUATRO. Onde nao ha estado a aplicar ou restaurar, o
+# playbook diz isso em voz alta em vez de nao existir -- o participante nao
+# precisa decorar quais modulos tem quais verbos.
 #
 # POR QUE 'corrige' NAO E 'pula': o solve deixa o ambiente no fim do modulo.
 # Usa-lo como conserto pula o aprendizado sem avisar ninguem. Sao alvos
@@ -51,24 +62,30 @@ _uso() {
   cat <<'EOF'
 uso: bash workshop.sh <verbo> <modulo>
 
-  verifica <n>   confere as tarefas do modulo (nao muda nada)
-  corrige  <n>   devolve o modulo ao estado inicial
-  pula     <n>   aplica o estado final do modulo (e o dos anteriores)
-  lista          os modulos e o que cada verbo tem disponivel
+  verifica    <n>  confere as tarefas do modulo (nao muda nada)
+  diagnostica <n>  por que nao passou: sintoma, causa provavel e comando
+  corrige     <n>  devolve o modulo ao estado inicial
+  pula        <n>  aplica o estado final do modulo (e o dos anteriores)
+  lista            os modulos e o que cada verbo tem disponivel
 
 exemplos:
-  bash workshop.sh verifica 2
-  bash workshop.sh corrige 2
-  bash workshop.sh pula 6
+  bash workshop.sh verifica 33
+  bash workshop.sh diagnostica 33
+  bash workshop.sh corrige 33
+  bash workshop.sh pula 33
+
+sem numero, 'diagnostica' olha a plataforma inteira:
+  bash workshop.sh diagnostica
 EOF
 }
 
 _arquivo() { # verbo modulo -> caminho, ou vazio
   local _f
   case "$1" in
-    verifica) _f=validation.yml ;;
-    corrige)  _f=reset.yml ;;
-    pula)     _f=solve.yml ;;
+    verifica)    _f=validation.yml ;;
+    diagnostica) _f=diagnose.yml ;;
+    corrige)     _f=reset.yml ;;
+    pula)        _f=solve.yml ;;
     *) return 1 ;;
   esac
   local _p="${_VAL}/module-$2/${_f}"
@@ -80,15 +97,15 @@ _lista() {
   for _m in "${_MODULOS[@]}"; do
     local _n="${_m%%:*}" _t="${_m#*:}" _v=""
     [[ -f "${_VAL}/module-${_n}/validation.yml" ]] && _v+="verifica "
+    [[ -f "${_VAL}/module-${_n}/diagnose.yml" ]]   && _v+="diagnostica "
     [[ -f "${_VAL}/module-${_n}/reset.yml" ]]      && _v+="corrige "
     [[ -f "${_VAL}/module-${_n}/solve.yml" ]]      && _v+="pula"
     printf '%-4s %-34s %s\n' "$_n" "$_t" "${_v:-—}"
   done
   cat <<'EOF'
 
-Modulo sem 'pula' termina no mesmo estado em que comecou -- e leitura, medicao,
-ou um exercicio que se reverte. Nao ha estado final a aplicar; pular esses e
-fechar a pagina.
+Todo modulo responde aos quatro verbos. Onde nao ha estado a aplicar ou a
+restaurar, o proprio playbook diz isso -- e diz por que.
 EOF
 }
 
@@ -108,6 +125,12 @@ case "$_verbo" in
   lista|--list|-l) _lista; exit 0 ;;
   ""|-h|--help)    _uso;   exit 0 ;;
 esac
+
+# 'diagnostica' sem numero olha so as camadas de plataforma
+if [[ "$_verbo" == "diagnostica" && -z "$_mod" ]]; then
+  ansible-playbook "${_VAL}/comum/diagnose-plataforma.yml"
+  exit $?
+fi
 
 [[ "$_mod" =~ ^[0-9]+$ ]] || { _uso; exit 2; }
 _mod="$(printf '%02d' "$((10#$_mod))")"

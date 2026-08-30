@@ -1,0 +1,33 @@
+---
+# Diagnostico do modulo 34 -- Precedencia de policies
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 34 Precedencia de policies"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "A policy de escopo de gateway"
+      kubernetes.core.k8s_info: {api_version: kuadrant.io/v1, kind: AuthPolicy, name: prod-web-deny-all, namespace: ingress-gateway}
+      register: m_deny
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 34 — Precedencia de policies
+          ===========================================================
+          {% if (m_deny.resources | default([]) | length) > 0 %}
+          {% for c in m_deny.resources[0].status.conditions | default([]) %}
+          {{ c.type }}={{ c.status }}  {{ c.message | default('') | truncate(120) }}
+          {% endfor %}
+          {% else %}
+          [!] A AuthPolicy de escopo de gateway nao existe. Sem ela nao ha default
+              negando, e a precedencia deste modulo nao tem o que demonstrar.
+          {% endif %}
+          [ ] Enforced=False AQUI e o estado CORRETO: policy de gateway cede onde a rota
+              declara a sua, e a mensagem NOMEIA quem venceu. Enforced=True significaria
+              que nenhuma rota declarou nada -- e a UI estaria em 401.
+          [ ] O Policy Topology nao marca quem venceu; nao existe selo de overridden. O
+              desenho faz a pergunta, o status responde.
+          ===========================================================

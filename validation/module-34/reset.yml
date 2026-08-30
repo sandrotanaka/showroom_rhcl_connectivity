@@ -1,0 +1,15 @@
+---
+# 3.4 CORRIGE -- o modulo so le status e o grafo de topologia.
+- name: "3.4 — corrige (nada a restaurar)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Explicar"
+      ansible.builtin.debug:
+        msg: |
+          Este modulo nao altera nada: le o status da policy de gateway e o
+          Policy Topology. Nao ha estado a restaurar.
+
+          Enforced=False na policy de gateway e o estado CORRETO -- ela cede
+          onde a rota declara a sua.

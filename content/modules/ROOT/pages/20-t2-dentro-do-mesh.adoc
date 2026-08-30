@@ -87,6 +87,14 @@ bash ~/workshop/scripts/workshop.sh verifica 21
 .Se falhar
 [%collapsible]
 ====
+Antes de improvisar, peca o diagnostico — ele olha as camadas de baixo e
+imprime sintoma, causa provável e comando:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh diagnostica 21
+----
+
 *A sonda devolveu `403` em vez de `000`?* O modo está `PERMISSIVE`. Confirme com
 o Exercício 2 e aplique o estado do módulo:
 

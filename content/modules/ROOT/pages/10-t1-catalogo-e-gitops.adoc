@@ -105,6 +105,14 @@ bash ~/workshop/scripts/workshop.sh verifica 11
 .Se falhar
 [%collapsible]
 ====
+Antes de improvisar, peca o diagnostico — ele olha as camadas de baixo e
+imprime sintoma, causa provável e comando:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh diagnostica 11
+----
+
 *Os pods estão `1/2` em vez de `2/2`?* O sidecar não foi injetado. Confira o
 label do namespace:
 

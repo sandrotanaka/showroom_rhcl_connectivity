@@ -165,6 +165,14 @@ bash ~/workshop/scripts/workshop.sh verifica 13
 .Se falhar
 [%collapsible]
 ====
+Antes de improvisar, peca o diagnostico — ele olha as camadas de baixo e
+imprime sintoma, causa provável e comando:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh diagnostica 13
+----
+
 *A `PipelineRun` ficou `Pending`?* Normalmente é o *workspace*: o
 `volumeClaimTemplate` precisa de uma StorageClass que atenda `ReadWriteOnce`.
 

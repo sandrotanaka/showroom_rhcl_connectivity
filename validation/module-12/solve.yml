@@ -1,0 +1,31 @@
+---
+# 1.2 PULA: garante o estado final -- sem desvio e com as Applications
+# sincronizadas. O 'automated' ja aplica sozinho; aqui so devolvemos o que o
+# exercicio 3 desviou e esperamos o Argo convergir.
+- name: "1.2 — pula (sem desvio, Applications sincronizadas)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Devolver ratings-v1 a uma replica"
+      kubernetes.core.k8s:
+        state: patched
+        api_version: apps/v1
+        kind: Deployment
+        name: ratings-v1
+        namespace: bookinfo
+        definition: {spec: {replicas: 1}}
+      failed_when: false
+
+    - name: "Esperar alguma Application ficar Synced"
+      kubernetes.core.k8s_info:
+        api_version: argoproj.io/v1alpha1
+        kind: Application
+        namespace: openshift-gitops
+      register: r_apps
+      until: >-
+        r_apps.resources | default([]) | selectattr('status.sync.status','defined')
+        | selectattr('status.sync.status','equalto','Synced') | list | length > 0
+      retries: 18
+      delay: 10
+      failed_when: false

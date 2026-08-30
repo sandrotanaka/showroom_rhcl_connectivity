@@ -1,0 +1,32 @@
+---
+# Diagnostico do modulo 24 -- Tracing
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 24 Tracing"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Objetos Telemetry"
+      kubernetes.core.k8s_info: {api_version: telemetry.istio.io/v1, kind: Telemetry}
+      register: m_tel
+      failed_when: false
+
+    - name: "Instancias do Tempo"
+      ansible.builtin.command: oc get pods -A -l app.kubernetes.io/name=tempo --no-headers
+      register: m_tempo
+      changed_when: false
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 24 — Tracing
+          ===========================================================
+          Telemetry: {{ m_tel.resources | default([]) | map(attribute='metadata.name') | join(', ') | default('nenhum') }}
+          Tempo: {{ 'presente' if (m_tempo.stdout | default('')) | length > 0 else 'ausente' }}
+          [ ] Trace quebrado no meio raramente e o Service Mesh. O sidecar PROPAGA os
+              cabecalhos, mas quem os repassa de uma chamada de entrada para uma de saida
+              e a APLICACAO. Um servico que nao repassa produz dois traces desconexos --
+              e e a unica coisa da trilha 2 que exige tocar em codigo.
+          ===========================================================

@@ -1,0 +1,40 @@
+---
+# Diagnostico do modulo 11 -- O catalogo e o repositorio
+#
+# Roda o diagnostico de plataforma primeiro (as camadas de baixo explicam a
+# maioria dos sintomas) e depois olha o que ESTE modulo pressupoe.
+# Nunca falha: e um relatorio, nao uma afirmacao.
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 11 O catalogo e o repositorio"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Pods da aplicacao"
+      kubernetes.core.k8s_info: {api_version: v1, kind: Pod, namespace: bookinfo}
+      register: m_pods
+      failed_when: false
+
+    - name: "Rotas publicadas"
+      kubernetes.core.k8s_info: {api_version: route.openshift.io/v1, kind: Route, namespace: bookinfo}
+      register: m_rotas
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 11 — O catalogo e o repositorio
+          ===========================================================
+          pods em bookinfo: {{ m_pods.resources | default([]) | length }}
+          rotas publicadas: {{ m_rotas.resources | default([]) | map(attribute='spec.host') | join(', ') | default('nenhuma') }}
+          {% if (m_pods.resources | default([]) | length) == 0 %}
+          [!] A amostra nao subiu. O provisionador substitui o __DOMAIN__ dos Route --
+              aplicar o diretorio direto publica o literal no hostname.
+                cd ~/rhcl && SAMPLES=bookinfo bash scripts/provision.sh samples
+          {% endif %}
+          {% if (m_rotas.resources | default([]) | length) == 0 and (m_pods.resources | default([]) | length) > 0 %}
+          [!] Pods no ar e nenhuma Route: a amostra sobe inteira e fica inalcancavel de
+              fora. Nao ha LoadBalancer neste ambiente; quem publica e o Route.
+          {% endif %}
+          ===========================================================

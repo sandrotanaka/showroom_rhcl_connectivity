@@ -1,0 +1,41 @@
+---
+# Diagnostico do modulo 22 -- Autorizacao por identidade
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 22 Autorizacao por identidade"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "AuthorizationPolicies do namespace"
+      kubernetes.core.k8s_info: {api_version: security.istio.io/v1, kind: AuthorizationPolicy, namespace: bookinfo}
+      register: m_ap
+      failed_when: false
+
+    - name: "Pods de sonda esquecidos"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: bookinfo
+        name: curl-teste
+      register: m_probe
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 22 — Autorizacao por identidade
+          ===========================================================
+          policies: {{ m_ap.resources | default([]) | map(attribute='metadata.name') | join(', ') | default('nenhuma') }}
+          {% if (m_ap.resources | default([]) | length) == 0 %}
+          [!] Sem AuthorizationPolicy, "so o productpage chama reviews" e verdade por
+              ACIDENTE -- e o que o codigo faz, nao o que alguem decidiu.
+                bash ~/workshop/scripts/workshop.sh pula 22
+          {% endif %}
+          {% if (m_probe.resources | default([]) | length) > 0 %}
+          [ ] O pod curl-teste ficou para tras (voce saiu com Ctrl-C):
+                oc delete pod curl-teste -n bookinfo
+          {% endif %}
+          [ ] Este modulo depende do anterior: o que a regra compara e o SPIFFE ID que o
+              mTLS provou. Sem mTLS nao ha identidade a comparar.
+          ===========================================================

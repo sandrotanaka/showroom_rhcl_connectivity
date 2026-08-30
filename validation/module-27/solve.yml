@@ -1,0 +1,6 @@
+---
+# 27 PULA: este modulo termina onde comecou -- o exercicio injeta e reverte. O
+# estado final e o ambiente LIMPO, que e exatamente o que o reset produz.
+# Chamamos o mesmo playbook em vez de duplicar: um solve que divergisse do
+# reset deixaria dois "estados corretos" diferentes para o mesmo modulo.
+- import_playbook: reset.yml

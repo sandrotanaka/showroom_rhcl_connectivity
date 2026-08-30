@@ -96,6 +96,14 @@ bash ~/workshop/scripts/workshop.sh verifica 25
 .Se falhar
 [%collapsible]
 ====
+Antes de improvisar, peca o diagnostico — ele olha as camadas de baixo e
+imprime sintoma, causa provável e comando:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh diagnostica 25
+----
+
 *A página inteira quebrou, em vez de degradar?* Confira se você injetou no
 `ratings` e não no `reviews` — derrubar o `reviews` derruba o bloco inteiro,
 porque o `productpage` não tem *fallback* para ele.

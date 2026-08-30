@@ -1,0 +1,50 @@
+---
+# Diagnostico do modulo 14 -- A cadeia de suprimento
+#
+# Roda o diagnostico de plataforma primeiro (as camadas de baixo explicam a
+# maioria dos sintomas) e depois olha o que ESTE modulo pressupoe.
+# Nunca falha: e um relatorio, nao uma afirmacao.
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 14 A cadeia de suprimento"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Execucoes da cadeia"
+      kubernetes.core.k8s_info: {api_version: tekton.dev/v1, kind: PipelineRun, namespace: bookinfo}
+      register: m_runs
+      failed_when: false
+
+    - name: "Controller do Tekton Chains"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: openshift-pipelines
+        label_selectors: [app=tekton-chains-controller]
+      register: m_chains
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 14 — A cadeia de suprimento
+          ===========================================================
+          execucoes: {{ m_runs.resources | default([]) | length }}
+          {% set assinadas = m_runs.resources | default([]) | selectattr('metadata.annotations','defined')
+             | selectattr('metadata.annotations.chains.tekton.dev/signed','defined') | list %}
+          assinadas: {{ assinadas | length }}
+          {% if (m_runs.resources | default([]) | length) == 0 %}
+          [!] A cadeia nunca executou neste cluster.
+                cd ~/rhcl && DISPARA_BUILD=1 SAMPLES=bookinfo bash scripts/provision.sh samples
+              E uma execucao POR IMAGEM -- o bookinfo tem seis.
+          {% elif assinadas | length == 0 %}
+          [!] Execucoes sem anotacao de assinatura. O controller do Chains le a chave e a
+              configuracao no BOOT: se ele subiu antes do setup, assina nada e nao
+              reclama.
+                oc rollout restart deployment/tekton-chains-controller -n openshift-pipelines
+          {% endif %}
+          [ ] Esta pipeline nao compila nada, e isso e o ponto: ela da procedencia a um
+              manifesto e a uma imagem de terceiro -- as duas coisas que a maioria das
+              organizacoes poe em producao sem cadeia nenhuma.
+          ===========================================================

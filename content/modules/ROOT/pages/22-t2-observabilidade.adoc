@@ -85,6 +85,14 @@ bash ~/workshop/scripts/workshop.sh verifica 23
 .Se falhar
 [%collapsible]
 ====
+Antes de improvisar, peca o diagnostico — ele olha as camadas de baixo e
+imprime sintoma, causa provável e comando:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh diagnostica 23
+----
+
 *O grafo está vazio?* A coleta leva até um minuto e a janela é de 5 minutos.
 Gere tráfego de novo e espere:
 

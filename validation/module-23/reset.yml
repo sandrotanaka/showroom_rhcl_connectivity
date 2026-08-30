@@ -1,0 +1,16 @@
+---
+# 2.3 CORRIGE -- observar nao altera nada; nao ha estado a restaurar.
+- name: "2.3 — corrige (nada a restaurar)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Explicar"
+      ansible.builtin.debug:
+        msg: |
+          Este modulo so le: grafo, consulta ao Thanos, ServiceMonitor. Nao ha
+          o que restaurar.
+
+          Grafo vazio quase sempre e janela, nao defeito -- a de 5 minutos com
+          raspagem de ate um minuto. Gere carga e espere:
+            bash ~/workshop/scripts/workshop.sh pula 23

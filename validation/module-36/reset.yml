@@ -1,0 +1,21 @@
+---
+# 3.6 CORRIGE: remove a API do workshop para refazer o exercicio do zero.
+- name: "3.6 — corrige (sem a API do workshop)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Remover o namespace"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Namespace
+        name: workshop-api
+        wait: true
+        wait_timeout: 120
+
+    - name: "Explicar"
+      ansible.builtin.debug:
+        msg: |
+          Namespace removido. O repositorio que o golden path criou no Git NAO
+          foi apagado -- ele e seu; o cluster e que e efemero.

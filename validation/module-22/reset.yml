@@ -1,0 +1,27 @@
+---
+# 2.2 CORRIGE: remove as sondas; as AuthorizationPolicy ficam.
+- name: "2.2 — corrige (sem pods de sonda)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Remover pods de sonda deixados para tras"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Pod
+        namespace: "{{ item.ns }}"
+        name: "{{ item.nome }}"
+      loop:
+        - {ns: default,  nome: mtls-probe}
+        - {ns: default,  nome: mtls-probe-check}
+        - {ns: bookinfo, nome: curl-teste}
+        - {ns: bookinfo, nome: authz-check}
+      loop_control: {label: "{{ item.ns }}/{{ item.nome }}"}
+      failed_when: false
+    - name: "Explicar"
+      ansible.builtin.debug:
+        msg: |
+          As AuthorizationPolicy continuam aplicadas -- elas sao o estado do
+          modulo, nao o exercicio. Para removê-las e refazer do zero:
+            oc delete -f ~/rhcl/samples/bookinfo/13-mesh-authorizationpolicy.yaml

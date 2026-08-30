@@ -1,0 +1,42 @@
+---
+# Diagnostico do modulo 33 -- Planos comerciais
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 33 Planos comerciais"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "PlanPolicy e RateLimitPolicy do namespace"
+      kubernetes.core.k8s_info: {api_version: extensions.kuadrant.io/v1alpha1, kind: PlanPolicy, namespace: bookinfo}
+      register: m_plan
+      failed_when: false
+    - name: "RateLimitPolicy do namespace"
+      kubernetes.core.k8s_info: {api_version: kuadrant.io/v1, kind: RateLimitPolicy, namespace: bookinfo}
+      register: m_rlp
+      failed_when: false
+    - name: "Contadores"
+      kubernetes.core.k8s_info: {api_version: limitador.kuadrant.io/v1alpha1, kind: Limitador, name: limitador, namespace: kuadrant-system}
+      register: m_lim
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 33 — Planos comerciais
+          ===========================================================
+          PlanPolicy: {{ m_plan.resources | default([]) | map(attribute='metadata.name') | join(', ') | default('nenhum') }}
+          RateLimitPolicy: {{ m_rlp.resources | default([]) | map(attribute='metadata.name') | join(', ') | default('nenhuma') }}
+          contadores no Limitador: {{ m_lim.resources[0].spec.limits | default([]) | length }}
+          {% set alvo_plan = m_plan.resources | default([]) | map(attribute='spec.targetRef.name') | list %}
+          {% set alvo_rlp = m_rlp.resources | default([]) | map(attribute='spec.targetRef.name') | list %}
+          {% if alvo_plan | intersect(alvo_rlp) | length > 0 %}
+          [!] As duas miram o mesmo alvo ({{ alvo_plan | intersect(alvo_rlp) | join(', ') }}).
+              A policy plana SOBREPOE o PlanPolicy: os tres planos medem igual, sem erro.
+          {% endif %}
+          [ ] Tres planos com 429 desde a PRIMEIRA requisicao e cota consumida, nao
+              policy errada -- e sao correcoes opostas. Reinicie os contadores:
+                oc delete pod -n kuadrant-system -l app=limitador
+          [ ] Edicao de limite que "nao pegou" quase sempre e o contador antigo: ele
+              guarda o teto vigente na criacao, e so morre quando a janela vira.
+          ===========================================================

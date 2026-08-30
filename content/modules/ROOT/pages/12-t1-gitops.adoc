@@ -156,6 +156,14 @@ bash ~/workshop/scripts/workshop.sh verifica 12
 .Se falhar
 [%collapsible]
 ====
+Antes de improvisar, peca o diagnostico — ele olha as camadas de baixo e
+imprime sintoma, causa provável e comando:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh diagnostica 12
+----
+
 *A `Application` não voltou a `Synced`?* Force a sincronização e veja o motivo:
 
 [source,role="execute"]

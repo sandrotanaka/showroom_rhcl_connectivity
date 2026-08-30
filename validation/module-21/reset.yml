@@ -1,0 +1,28 @@
+---
+# 2.1 CORRIGE: o modulo nao altera policy -- ele SONDA. O que se restaura
+# e a ausencia de pods de sonda, que ficam quando alguem sai com Ctrl-C.
+- name: "2.1 — corrige (sem pods de sonda)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Remover pods de sonda deixados para tras"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Pod
+        namespace: "{{ item.ns }}"
+        name: "{{ item.nome }}"
+      loop:
+        - {ns: default,  nome: mtls-probe}
+        - {ns: default,  nome: mtls-probe-check}
+        - {ns: bookinfo, nome: curl-teste}
+        - {ns: bookinfo, nome: authz-check}
+      loop_control: {label: "{{ item.ns }}/{{ item.nome }}"}
+      failed_when: false
+    - name: "Explicar"
+      ansible.builtin.debug:
+        msg: |
+          O mTLS do namespace NAO foi mexido: ele e estado da plataforma, nao do
+          exercicio. Para reaplicar o modo STRICT:
+            bash ~/workshop/scripts/workshop.sh pula 21

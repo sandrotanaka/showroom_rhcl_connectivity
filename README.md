@@ -40,23 +40,46 @@ policies e os contadores do limitador são por plano, não por pessoa: num clust
 compartilhado o tráfego de um consome a cota do outro, e o `429` aparece antes da
 hora — a pessoa conclui que errou o comando.
 
-## Os três verbos
+## Os quatro verbos
 
-O participante decora um comando só:
+O participante decora um comando só, e **todo módulo responde aos quatro**:
 
 ```bash
-bash scripts/workshop.sh verifica 33    # confere as tarefas do módulo
-bash scripts/workshop.sh corrige 33     # devolve o módulo ao estado INICIAL
-bash scripts/workshop.sh pula 33        # aplica o estado FINAL (e o dos anteriores)
-bash scripts/workshop.sh lista          # o que cada módulo tem disponível
+bash scripts/workshop.sh verifica 33       # confere as tarefas do módulo
+bash scripts/workshop.sh diagnostica 33    # por que não passou
+bash scripts/workshop.sh corrige 33        # devolve ao estado INICIAL
+bash scripts/workshop.sh pula 33           # aplica o estado FINAL (e o dos anteriores)
+bash scripts/workshop.sh diagnostica       # sem número: só as camadas de plataforma
 ```
 
 `corrige` e `pula` têm alvos **opostos** — início e fim — e por isso são dois
 arquivos, não um com flag. Um `solve` usado como conserto pula o aprendizado sem
 avisar ninguém.
 
-Módulo que não muda estado — só leitura e medição — não tem `pula`. O `lista` diz
-quais são.
+`diagnostica` **não** é `verifica` com mais saída. Verificar responde passou/não
+passou e *precisa* falhar; diagnosticar responde *por quê*, e precisa imprimir o
+relatório inteiro mesmo quando alguma consulta não resolve. Junto, daria um
+comando que esconde metade do relatório justamente no caso ruim.
+
+Uniformidade é decisão de contrato: onde não há estado a aplicar ou restaurar, o
+playbook **diz isso e diz por quê**, em vez de não existir. O participante não
+precisa decorar quais módulos têm quais verbos.
+
+### O diagnóstico
+
+Cada `diagnose.yml` roda primeiro `validation/comum/diagnose-plataforma.yml` —
+as camadas de baixo explicam a maioria dos sintomas — e depois olha o que aquele
+módulo pressupõe. O relatório sai em três partes:
+
+- **`[!]` achado com causa provável e comando** — ex.: nó sob `DiskPressure`
+  (o Authorino cai e a borda passa a devolver `500` no lugar de `401`, e a policy
+  não tem culpa); `RateLimitPolicy` e `PlanPolicy` no mesmo alvo (a plana
+  sobrepõe e os planos somem sem erro); `ApplicationSet` sem `cloneProtocol`
+  (nada sincroniza enquanto o objeto reporta sucesso).
+- **`[ ]` contexto** — o que é normal, e o que costuma ser lido errado.
+- **ruído benigno** — o que **não** perseguir. Ex.: `Gateway` com
+  `AddressNotAssigned` num ambiente sem LoadBalancer: quem publica é o `Route`, a
+  aplicação responde `200`, e ler "não publicou" leva a investigar o lado errado.
 
 ## Estrutura
 
@@ -71,8 +94,10 @@ content/
 validation/
   module-XX/
     validation.yml               verifica — afirma as tarefas do módulo
+    diagnose.yml                 diagnostica — sintoma, causa e comando
     reset.yml                    corrige — estado inicial
     solve.yml                    pula — estado final
+  comum/diagnose-plataforma.yml  as camadas de baixo, importadas por todo diagnose
 ui-config.yml                    tabs do painel direito (nookbag)
 ```
 

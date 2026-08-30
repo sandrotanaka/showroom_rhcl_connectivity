@@ -1,0 +1,32 @@
+---
+# Diagnostico do modulo 35 -- Metrica de negocio
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 35 Metrica de negocio"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "TelemetryPolicy"
+      kubernetes.core.k8s_info: {api_version: extensions.kuadrant.io/v1alpha1, kind: TelemetryPolicy}
+      register: m_tel
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 35 — Metrica de negocio
+          ===========================================================
+          {% for t in m_tel.resources | default([]) %}
+          {{ t.metadata.namespace }}/{{ t.metadata.name }} -> {{ t.spec.targetRef.kind }}/{{ t.spec.targetRef.name }}
+          {% endfor %}
+          {% if (m_tel.resources | default([]) | length) == 0 %}
+          [!] Sem TelemetryPolicy a metrica responde "quantos 429 houve" e nao "o plano
+              free esta saturando" -- que e a pergunta que a area comercial faz.
+          {% endif %}
+          [ ] Nesta release a TelemetryPolicy so aceita Gateway como alvo. Uma policy
+              mirando HTTPRoute e RECUSADA pelo servidor. A dimensao vale para o gateway
+              inteiro -- saber disso antes de prometer "metrica por rota" a um cliente.
+          [ ] Serie sem o label plan quase sempre e coleta ainda nao ocorrida: gere
+              trafego pelas tres chaves e espere um minuto.
+          ===========================================================

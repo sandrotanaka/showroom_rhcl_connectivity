@@ -1,0 +1,32 @@
+---
+# Diagnostico do modulo 26 -- Circuit breaker
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 26 Circuit breaker"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "DestinationRules do namespace"
+      kubernetes.core.k8s_info: {api_version: networking.istio.io/v1, kind: DestinationRule, namespace: bookinfo}
+      register: m_dr
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 26 — Circuit breaker
+          ===========================================================
+          DestinationRule: {{ m_dr.resources | default([]) | map(attribute='metadata.name') | join(', ') | default('nenhuma') }}
+          {% set rev = m_dr.resources | default([]) | selectattr('metadata.name','equalto','reviews') | list %}
+          {% if rev | length > 0 %}
+          subsets de reviews: {{ rev[0].spec.subsets | default([]) | map(attribute='name') | join(', ') }}
+          {% endif %}
+          {% if 'ratings-breaker' in (m_dr.resources | default([]) | map(attribute='metadata.name') | list) %}
+          [!] O breaker do exercicio continua ativo. Ele recusa com 503 acima do teto --
+              e o teto foi posto baixo de proposito, para caber num exercicio.
+                bash ~/workshop/scripts/workshop.sh corrige 26
+          {% endif %}
+          [ ] Nenhum 503 no exercicio quase sempre e concorrencia insuficiente: o teto e
+              por conexao, e um cliente que reaproveita conexao nao o atinge.
+          ===========================================================

@@ -90,6 +90,14 @@ bash ~/workshop/scripts/workshop.sh verifica 36
 .Se falhar
 [%collapsible]
 ====
+Antes de improvisar, peca o diagnostico — ele olha as camadas de baixo e
+imprime sintoma, causa provável e comando:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh diagnostica 36
+----
+
 *O repositório foi criado mas nada subiu?* Sem o OpenShift GitOps o template abre
 o PR e gera os manifests, mas nada sincroniza:
 

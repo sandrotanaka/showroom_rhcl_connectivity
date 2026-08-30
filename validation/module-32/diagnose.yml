@@ -1,0 +1,45 @@
+---
+# Diagnostico do modulo 32 -- Duas fronteiras, um hostname
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 32 Duas fronteiras, um hostname"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "AuthPolicies do namespace e do gateway"
+      kubernetes.core.k8s_info: {api_version: kuadrant.io/v1, kind: AuthPolicy}
+      register: m_auth
+      failed_when: false
+
+    - name: "Chaves do produto"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        namespace: kuadrant-system
+        label_selectors: [app=partner]
+      register: m_keys
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 32 — Duas fronteiras, um hostname
+          ===========================================================
+          {% for a in m_auth.resources | default([]) %}
+          {{ a.metadata.namespace }}/{{ a.metadata.name }} -> {{ a.spec.targetRef.kind }}/{{ a.spec.targetRef.name }}
+          {% endfor %}
+          {% set rotas_com_policy = m_auth.resources | default([]) | selectattr('spec.targetRef.kind','equalto','HTTPRoute')
+             | map(attribute='spec.targetRef.name') | list %}
+          {% if 'bookinfo-ui' not in rotas_com_policy %}
+          [!] A rota da UI nao declarou policy propria, entao vale a do gateway -- que
+              nega tudo. 401 na UI nao e defeito: e o default seguro funcionando.
+              Publico e uma DECISAO (uma policy que permite anonimo), nao a ausencia de
+              uma.
+                bash ~/workshop/scripts/workshop.sh pula 32
+          {% endif %}
+          chaves: {{ m_keys.resources | default([]) | length }}
+          [ ] Chave valida que devolve 401 logo depois de mexer em policy costuma ser
+              reindexacao: o Authorino nem sempre reindexa o Secret apos churn.
+                oc annotate secret -n kuadrant-system -l app=partner reindex="$(date +%s)" --overwrite
+          ===========================================================

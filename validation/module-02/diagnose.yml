@@ -1,0 +1,47 @@
+---
+# Diagnostico do modulo 02 -- Seu ambiente
+#
+# Roda o diagnostico de plataforma primeiro (as camadas de baixo explicam a
+# maioria dos sintomas) e depois olha o que ESTE modulo pressupoe.
+# Nunca falha: e um relatorio, nao uma afirmacao.
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 02 Seu ambiente"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Repositorios clonados no home"
+      ansible.builtin.stat: {path: "{{ lookup('env','HOME') }}/rhcl/scripts/preflight.sh"}
+      register: m_repo
+      failed_when: false
+
+    - name: "CRDs que o dia inteiro pressupoe"
+      ansible.builtin.command: >-
+        oc get crd planpolicies.extensions.kuadrant.io peerauthentications.security.istio.io
+        pipelineruns.tekton.dev applications.argoproj.io --no-headers
+      register: m_crd
+      changed_when: false
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 02 — Seu ambiente
+          ===========================================================
+          {% if not m_repo.stat.exists %}
+          [!] O repositorio da plataforma nao esta em ~/rhcl.
+              Quase todo comando do dia sai de la.
+                git clone <repo> ~/rhcl
+          {% else %}
+          [ ] ~/rhcl presente.
+          {% endif %}
+          {% if m_crd.rc != 0 %}
+          [!] Falta pelo menos um operador. A saida do oc diz qual:
+              {{ m_crd.stderr | default('') | truncate(160) }}
+              O verificador completo diz o que falta e como corrigir:
+                bash ~/rhcl/scripts/preflight.sh
+          {% else %}
+          [ ] Connectivity Link, Service Mesh, Pipelines e GitOps presentes.
+          {% endif %}
+          ===========================================================

@@ -1,0 +1,30 @@
+---
+# 3.5 PULA: o estado final e "ha metrica por plano coletada". Sem trafego pelas
+# tres chaves, a consulta volta vazia e o painel abre sem serie.
+- name: "3.5 — pula (metrica por plano coletada)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Descobrir o dominio"
+      kubernetes.core.k8s_info: {api_version: config.openshift.io/v1, kind: Ingress, name: cluster}
+      register: r_ing
+
+    - name: "Gerar trafego identificado pelas tres chaves"
+      ansible.builtin.shell: |
+        D={{ r_ing.resources[0].spec.domain }}
+        for tier in free silver gold; do
+          KEY=$(oc get secret -n kuadrant-system -l app=partner,kuadrant.io/plan-id=$tier \
+            -o jsonpath='{.items[0].data.api_key}' 2>/dev/null | base64 -d)
+          [ -z "$KEY" ] && continue
+          for i in $(seq 1 12); do
+            curl -sk -o /dev/null "https://bookinfo.${D}/api/v1/products?APIKEY=${KEY}"
+          done
+          sleep 11
+        done
+      args: {executable: /bin/bash}
+      changed_when: true
+      failed_when: false
+
+    - name: "Esperar a raspagem"
+      ansible.builtin.pause: {seconds: 60}

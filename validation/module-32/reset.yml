@@ -1,0 +1,30 @@
+---
+# 3.2 CORRIGE: tira as policies do modulo e devolve a UI ao 401 do deny-all --
+# que e o estado INICIAL do modulo, e nao um defeito.
+- name: "3.2 — corrige (sem policies de rota)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Remover as AuthPolicy das rotas"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: kuadrant.io/v1
+        kind: AuthPolicy
+        namespace: bookinfo
+        name: "{{ item }}"
+      loop: [bookinfo-ui-authpolicy, bookinfo-api-authpolicy]
+
+    - name: "Remover a protecao de capacidade da rota anonima"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: kuadrant.io/v1
+        kind: RateLimitPolicy
+        namespace: bookinfo
+        name: bookinfo-ui-ratelimit
+
+    - name: "Explicar"
+      ansible.builtin.debug:
+        msg: |
+          A UI volta a devolver 401. Nao e defeito: sem policy propria, vale a do
+          gateway -- e ela nega. O default seguro e esse.

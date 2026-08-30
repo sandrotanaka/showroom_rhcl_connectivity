@@ -1,0 +1,15 @@
+---
+# 3.5 CORRIGE -- consultar metrica nao altera nada.
+- name: "3.5 — corrige (nada a restaurar)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Explicar"
+      ansible.builtin.debug:
+        msg: |
+          Este modulo so consulta o Thanos e abre o painel. Nao ha estado a
+          restaurar -- serie de metrica nao se apaga, ela envelhece.
+
+          Se a consulta volta vazia, gere trafego identificado e espere:
+            bash ~/workshop/scripts/workshop.sh pula 35

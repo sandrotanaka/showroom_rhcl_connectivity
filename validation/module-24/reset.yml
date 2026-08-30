@@ -1,0 +1,14 @@
+---
+# 2.4 CORRIGE -- ler trace nao altera nada.
+- name: "2.4 — corrige (nada a restaurar)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Explicar"
+      ansible.builtin.debug:
+        msg: |
+          Este modulo so le traces. Nao ha estado a restaurar.
+
+          Se o objeto Telemetry sumiu do namespace, ele e estado de plataforma:
+            bash ~/workshop/scripts/workshop.sh pula 24

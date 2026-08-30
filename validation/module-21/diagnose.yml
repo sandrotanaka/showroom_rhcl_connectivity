@@ -1,0 +1,31 @@
+---
+# Diagnostico do modulo 21 -- Dentro do Service Mesh
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 21 Dentro do Service Mesh"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "PeerAuthentication do namespace"
+      kubernetes.core.k8s_info: {api_version: security.istio.io/v1, kind: PeerAuthentication, namespace: bookinfo}
+      register: m_pa
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 21 — Dentro do Service Mesh
+          ===========================================================
+          {% set modos = m_pa.resources | default([]) | map(attribute='spec.mtls.mode') | list %}
+          modo de mTLS: {{ modos | join(', ') | default('nenhuma PeerAuthentication') }}
+          {% if 'PERMISSIVE' in modos %}
+          [!] PERMISSIVE. A sonda de fora vai devolver 403 e nao 000 -- e sao camadas
+              diferentes: em 403 a conexao COMPLETOU e quem recusou foi a
+              AuthorizationPolicy; em 000 o servidor derrubou antes, por falta de
+              certificado. Corrigir a camada errada nao muda nada.
+          {% elif modos | length == 0 %}
+          [!] Nenhuma PeerAuthentication: tudo em texto claro.
+                bash ~/workshop/scripts/workshop.sh pula 21
+          {% endif %}
+          ===========================================================

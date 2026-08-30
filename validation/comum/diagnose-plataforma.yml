@@ -1,0 +1,175 @@
+---
+# ===========================================================================
+# Diagnostico de plataforma -- roda ANTES do diagnostico de qualquer modulo.
+#
+# NAO AFIRMA NADA. Diferente de validation.yml, este playbook nunca falha: ele
+# olha as camadas de baixo e imprime sintoma, causa provavel e comando. Falhar
+# aqui esconderia justamente o que a pessoa precisa ler.
+#
+# O que esta aqui sao as armadilhas ja MEDIDAS neste projeto -- as que produzem
+# sintoma enganoso, em que o lugar obvio de investigar e o errado.
+# ===========================================================================
+- name: "Diagnostico — camadas de plataforma"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [diagnose]
+  tasks:
+    - name: "Sessao"
+      ansible.builtin.command: oc whoami
+      register: d_who
+      changed_when: false
+      failed_when: false
+
+    - name: "Nos e suas condicoes"
+      kubernetes.core.k8s_info: {api_version: v1, kind: Node}
+      register: d_nodes
+      failed_when: false
+
+    - name: "Pods do Connectivity Link"
+      kubernetes.core.k8s_info: {api_version: v1, kind: Pod, namespace: kuadrant-system}
+      register: d_kua
+      failed_when: false
+
+    - name: "Gateways"
+      kubernetes.core.k8s_info: {api_version: gateway.networking.k8s.io/v1, kind: Gateway}
+      register: d_gw
+      failed_when: false
+
+    - name: "AuthPolicies"
+      kubernetes.core.k8s_info: {api_version: kuadrant.io/v1, kind: AuthPolicy}
+      register: d_auth
+      failed_when: false
+
+    - name: "RateLimitPolicies e PlanPolicies"
+      kubernetes.core.k8s_info: {api_version: kuadrant.io/v1, kind: RateLimitPolicy}
+      register: d_rlp
+      failed_when: false
+    - name: "PlanPolicies"
+      kubernetes.core.k8s_info: {api_version: extensions.kuadrant.io/v1alpha1, kind: PlanPolicy}
+      register: d_plan
+      failed_when: false
+
+    - name: "Chaves de parceiro"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        namespace: kuadrant-system
+        label_selectors: [app=partner]
+      register: d_keys
+      failed_when: false
+
+    - name: "ApplicationSets e Applications"
+      kubernetes.core.k8s_info: {api_version: argoproj.io/v1alpha1, kind: ApplicationSet, namespace: openshift-gitops}
+      register: d_appset
+      failed_when: false
+    - name: "Applications"
+      kubernetes.core.k8s_info: {api_version: argoproj.io/v1alpha1, kind: Application, namespace: openshift-gitops}
+      register: d_apps
+      failed_when: false
+
+    - name: "Pods da aplicacao do workshop"
+      kubernetes.core.k8s_info: {api_version: v1, kind: Pod, namespace: bookinfo}
+      register: d_book
+      failed_when: false
+
+    # ------------------------------------------------------------------ ---
+    - name: "Achados"
+      ansible.builtin.set_fact:
+        d_pressao: "{{ d_nodes.resources | default([]) | map(attribute='status.conditions') | flatten
+                       | selectattr('type','search','Pressure') | selectattr('status','equalto','True')
+                       | map(attribute='type') | unique | list }}"
+        d_kua_fora: "{{ d_kua.resources | default([])
+                        | rejectattr('status.phase','equalto','Running')
+                        | map(attribute='metadata.name') | list }}"
+        d_gw_nao_prog: "{{ d_gw.resources | default([]) | selectattr('status.conditions','defined')
+                           | selectattr('status.conditions', 'search', 'AddressNotAssigned')
+                           | map(attribute='metadata.name') | list }}"
+        d_auth_defaults: "{{ d_auth.resources | default([]) | selectattr('spec.defaults','defined')
+                             | map(attribute='metadata.name') | list }}"
+        d_alvos_rlp: "{{ d_rlp.resources | default([]) | map(attribute='spec.targetRef.name') | list }}"
+        d_alvos_plan: "{{ d_plan.resources | default([]) | map(attribute='spec.targetRef.name') | list }}"
+        d_chaves_sem_tier: "{{ d_keys.resources | default([])
+                               | rejectattr('metadata.labels.kuadrant.io/plan-id','defined')
+                               | map(attribute='metadata.name') | list }}"
+        d_appset_ssh: "{{ d_appset.resources | default([])
+                          | selectattr('spec.generators','defined')
+                          | rejectattr('spec.generators', 'search', 'cloneProtocol')
+                          | map(attribute='metadata.name') | list }}"
+        d_apps_ruins: "{{ d_apps.resources | default([]) | selectattr('status.health.status','defined')
+                          | rejectattr('status.health.status','equalto','Healthy')
+                          | map(attribute='metadata.name') | list }}"
+        d_sem_sidecar: "{{ d_book.resources | default([])
+                           | selectattr('status.phase','equalto','Running')
+                           | selectattr('spec.containers','length_is',1)
+                           | map(attribute='metadata.name') | list }}"
+
+    - name: "Colisao de rate limit no mesmo alvo"
+      ansible.builtin.set_fact:
+        d_colisao: "{{ d_alvos_rlp | intersect(d_alvos_plan) }}"
+
+    - name: "Relatorio"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          DIAGNOSTICO DE PLATAFORMA
+          ===========================================================
+          sessao: {{ d_who.stdout | default('NAO AUTENTICADO') }}
+
+          {% if d_pressao | length > 0 %}
+          [!] NO SOB PRESSAO: {{ d_pressao | join(', ') }}
+              O Authorino cai sob DiskPressure e a borda passa a devolver 500
+              no lugar de 401. A policy NAO tem culpa -- nao a reescreva.
+              oc describe node | grep -A5 Conditions
+          {% endif %}
+          {% if d_kua_fora | length > 0 %}
+          [!] COMPONENTE DO CONNECTIVITY LINK FORA: {{ d_kua_fora | join(', ') }}
+              Sintoma na borda: 500 em vez de 401, ou limite que nao conta.
+              oc get pods -n kuadrant-system
+          {% endif %}
+          {% if d_colisao | length > 0 %}
+          [!] RATELIMITPOLICY E PLANPOLICY NO MESMO ALVO: {{ d_colisao | join(', ') }}
+              Nesta release a policy plana SOBREPOE o PlanPolicy: os planos
+              somem e as tres medicoes ficam identicas, sem erro nenhum.
+              oc get ratelimitpolicy,planpolicy -A
+          {% endif %}
+          {% if d_auth_defaults | length > 0 %}
+          [!] AUTHPOLICY COM spec.defaults: {{ d_auth_defaults | join(', ') }}
+              Fica Accepted=True e Enforced=False, e nenhuma chave funciona.
+              O campo correto para policy de rota e spec.rules.
+          {% endif %}
+          {% if d_chaves_sem_tier | length > 0 %}
+          [!] CHAVE SEM TIER: {{ d_chaves_sem_tier | join(', ') }}
+              Sem o label de plano a identidade cai no catch-all -- e, se ele
+              nao existir, passa SEM LIMITE (fail-open).
+              oc get secret -n kuadrant-system -l app=partner -L kuadrant.io/plan-id
+          {% endif %}
+          {% if d_appset_ssh | length > 0 %}
+          [!] APPLICATIONSET SEM cloneProtocol: {{ d_appset_ssh | join(', ') }}
+              O default e ssh, o Argo pede um agente que nao existe, e NENHUMA
+              Application sincroniza -- enquanto o ApplicationSet reporta
+              sucesso. Confira o nivel do campo (fica no scmProvider).
+          {% endif %}
+          {% if d_apps_ruins | length > 0 %}
+          [ ] Application nao Healthy: {{ d_apps_ruins | join(', ') }}
+              Health e SYNC sao independentes: pode estar Synced e Degraded.
+              oc get application -n openshift-gitops
+          {% endif %}
+          {% if d_sem_sidecar | length > 0 %}
+          [!] POD SEM SIDECAR (1/1 em vez de 2/2): {{ d_sem_sidecar | join(', ') }}
+              Sem o sidecar nao ha mTLS, nem metrica, nem trace -- e as trilhas
+              2 e 3 medem o vazio sem acusar erro.
+              oc get ns bookinfo --show-labels
+          {% endif %}
+
+          -- ruido benigno, NAO perseguir --------------------------------
+          {% if d_gw_nao_prog | length > 0 %}
+          . Gateway com AddressNotAssigned: {{ d_gw_nao_prog | join(', ') }}
+            A GatewayClass cria o Service como LoadBalancer, e este ambiente
+            nao tem um. Quem publica e o Route do OpenShift: o listener fica
+            Programmed=True e a aplicacao responde 200. Ler "nao publicou"
+            aqui leva a investigar o lado errado.
+          {% endif %}
+          . APIKey em Pending no developer portal e o estado CORRETO -- ninguem
+            aprovou, e aprovar cunha um Secret novo no meio do exercicio.
+          ===========================================================

@@ -1,0 +1,32 @@
+---
+# Diagnostico do modulo 25 -- Fault injection
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 25 Fault injection"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "VirtualServices do namespace"
+      kubernetes.core.k8s_info: {api_version: networking.istio.io/v1, kind: VirtualService, namespace: bookinfo}
+      register: m_vs
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 25 — Fault injection
+          ===========================================================
+          {% set falhas = m_vs.resources | default([]) | selectattr('spec.http','defined')
+             | map(attribute='spec.http') | map('first') | selectattr('fault','defined') | list %}
+          VirtualService: {{ m_vs.resources | default([]) | map(attribute='metadata.name') | join(', ') | default('nenhuma') }}
+          {% if falhas | length > 0 %}
+          [!] Ha {{ falhas | length }} injecao(oes) de falha ATIVA. Tudo o que voce medir
+              daqui para frente carrega esse erro -- e ele nao aparece em oc get pods,
+              porque o servico esta saudavel: a falha esta no caminho ate ele.
+                bash ~/workshop/scripts/workshop.sh corrige 25
+          {% endif %}
+          [ ] Nao use este cenario para retry ou timeout: retry sobre falha em 100%
+              repete o mesmo erro, e timeout sobre abort imediato nunca e atingido. Os
+              dois testes obvios falham em silencio.
+          ===========================================================

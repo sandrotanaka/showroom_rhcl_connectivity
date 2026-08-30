@@ -68,6 +68,14 @@ bash ~/workshop/scripts/workshop.sh verifica 24
 .Se falhar
 [%collapsible]
 ====
+Antes de improvisar, peca o diagnostico — ele olha as camadas de baixo e
+imprime sintoma, causa provável e comando:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh diagnostica 24
+----
+
 *Nenhum trace aparece?* A amostragem pode estar baixa ou o collector não está
 entregando. Confira se há spans chegando:
 

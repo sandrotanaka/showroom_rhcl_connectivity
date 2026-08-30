@@ -1,0 +1,42 @@
+---
+# Diagnostico do modulo 12 -- OpenShift GitOps
+#
+# Roda o diagnostico de plataforma primeiro (as camadas de baixo explicam a
+# maioria dos sintomas) e depois olha o que ESTE modulo pressupoe.
+# Nunca falha: e um relatorio, nao uma afirmacao.
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 12 OpenShift GitOps"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Applications e seus dois estados"
+      kubernetes.core.k8s_info: {api_version: argoproj.io/v1alpha1, kind: Application, namespace: openshift-gitops}
+      register: m_apps
+      failed_when: false
+
+    - name: "O Deployment do exercicio de desvio"
+      kubernetes.core.k8s_info: {api_version: apps/v1, kind: Deployment, name: ratings-v1, namespace: bookinfo}
+      register: m_dep
+      failed_when: false
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 12 — OpenShift GitOps
+          ===========================================================
+          {% for a in m_apps.resources | default([]) %}
+          {{ a.metadata.name }}: sync={{ a.status.sync.status | default('?') }} health={{ a.status.health.status | default('?') }}
+          {% endfor %}
+
+          [ ] Sync e health sao INDEPENDENTES. Synced+Degraded significa que o Git foi
+              aplicado fielmente e o que estava no Git esta quebrado -- procurar no Argo
+              e procurar no lugar errado.
+          {% if (m_dep.resources | default([]) | length) > 0 and m_dep.resources[0].spec.replicas != 1 %}
+          [!] ratings-v1 com {{ m_dep.resources[0].spec.replicas }} replicas: o desvio do
+              exercicio 3 continua ativo. selfHeal esta DESLIGADO aqui de proposito --
+              o Argo detecta e nao desfaz, porque as trilhas 2 e 3 editam ao vivo.
+                bash ~/workshop/scripts/workshop.sh corrige 12
+          {% endif %}
+          ===========================================================

@@ -118,6 +118,14 @@ bash ~/workshop/scripts/workshop.sh verifica 33
 .Se falhar
 [%collapsible]
 ====
+Antes de improvisar, peca o diagnostico — ele olha as camadas de baixo e
+imprime sintoma, causa provável e comando:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh diagnostica 33
+----
+
 *Os três planos deram resultados idênticos?* Provavelmente uma `RateLimitPolicy`
 plana está sobrepondo o `PlanPolicy` — nesta release a precedência entre as duas
 não é a que se espera:

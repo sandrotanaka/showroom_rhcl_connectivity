@@ -1,0 +1,34 @@
+---
+# 1.4 CORRIGE: limpa as execucoes da cadeia no namespace da aplicacao.
+#
+# A cadeia produziu copias assinadas no registry -- isso NAO se desfaz aqui, e
+# nao deveria: procedencia registrada e o produto do modulo. O que se limpa sao
+# as execucoes, para reexecutar do zero.
+- name: "1.4 — corrige (sem execucoes da cadeia)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Listar as execucoes"
+      kubernetes.core.k8s_info:
+        api_version: tekton.dev/v1
+        kind: PipelineRun
+        namespace: bookinfo
+      register: r_runs
+      failed_when: false
+
+    - name: "Remover"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: tekton.dev/v1
+        kind: PipelineRun
+        namespace: bookinfo
+        name: "{{ item.metadata.name }}"
+      loop: "{{ r_runs.resources | default([]) }}"
+      loop_control: {label: "{{ item.metadata.name }}"}
+
+    - name: "Explicar o que nao foi desfeito"
+      ansible.builtin.debug:
+        msg: |
+          As copias assinadas no registry e os registros no Rekor continuam la.
+          Log de transparencia nao se apaga -- e esse e o ponto dele.

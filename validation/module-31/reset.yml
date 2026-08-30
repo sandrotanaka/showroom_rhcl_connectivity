@@ -1,0 +1,23 @@
+---
+# 3.1 CORRIGE: devolve a borda ao dono anterior -- rota do upstream de volta,
+# rotas do prod-web fora. E o unico reset do dia que MOVE trafego de gateway.
+- name: "3.1 — corrige (borda de volta no gateway da amostra)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Remover as rotas do prod-web"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: gateway.networking.k8s.io/v1
+        kind: HTTPRoute
+        namespace: bookinfo
+        name: "{{ item }}"
+      loop: [bookinfo-ui, bookinfo-api]
+
+    - name: "Reaplicar a amostra (traz de volta a rota do upstream)"
+      ansible.builtin.command:
+        cmd: bash scripts/provision.sh samples
+        chdir: "{{ lookup('env','HOME') }}/rhcl"
+      environment: {SAMPLES: bookinfo}
+      changed_when: true
