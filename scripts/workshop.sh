@@ -165,6 +165,59 @@ _ansible() { # arquivo
   ansible-playbook "$1"
 }
 
+# ---------------------------------------------------------------------------
+# PROGRESSO
+#
+# Um modulo so entra na lista quando a VERIFICACAO passa -- nunca por ter sido
+# aberto. Assim 'status' responde "o que eu fiz", e nao "onde eu cliquei".
+_passou()  { [[ -f "$_PROGRESSO" ]] && grep -qx "$1" "$_PROGRESSO"; }
+_marca()   { _passou "$1" || echo "$1" >> "$_PROGRESSO"; }
+_titulo()  { for _m in "${_MODULOS[@]}"; do [[ "${_m%%:*}" == "$1" ]] && { printf '%s' "${_m#*:}"; return; }; done; }
+_atual()   { for _m in "${_MODULOS[@]}"; do _passou "${_m%%:*}" || { printf '%s' "${_m%%:*}"; return; }; done; }
+
+_status() {
+  local _feitos=0 _total=0 _at; _at="$(_atual)"
+  for _m in "${_MODULOS[@]}"; do
+    local _n="${_m%%:*}" _t="${_m#*:}" _marca=" " _seta="  "
+    _total=$((_total+1))
+    if _passou "$_n"; then _marca="x"; _feitos=$((_feitos+1)); fi
+    [[ "$_n" == "$_at" ]] && _seta="->"
+    printf ' %s [%s] %-4s %s\n' "$_seta" "$_marca" "$_n" "$_t"
+  done
+  echo
+  if [[ -z "$_at" ]]; then
+    printf ' %s de %s -- acabou. Va para a conclusao do guia.\n' "$_feitos" "$_total"
+  else
+    printf ' %s de %s. Voce esta no modulo %s -- %s\n' "$_feitos" "$_total" "$_at" "$(_titulo "$_at")"
+    printf ' seguir:  bash workshop.sh proximo\n'
+  fi
+  [[ -f "$_PROGRESSO" ]] && printf ' zerar:   rm %s\n' "$_PROGRESSO"
+  return 0
+}
+
+_proximo() {
+  local _at; _at="$(_atual)"
+  [[ -n "$_at" ]] || { echo "nao ha proximo: todos os modulos passaram."; return 0; }
+
+  printf '\n--> verificando o modulo %s -- %s\n\n' "$_at" "$(_titulo "$_at")"
+  if _roda verifica "$_at"; then
+    _marca "$_at"
+    local _prox; _prox="$(_atual)"
+    if [[ -z "$_prox" ]]; then
+      printf '\n[ok] modulo %s fechado. Era o ultimo -- va para a conclusao.\n' "$_at"
+    else
+      printf '\n[ok] modulo %s fechado.\n     proximo: %s -- %s\n' "$_at" "$_prox" "$(_titulo "$_prox")"
+    fi
+  else
+    # NAO AVANCA, e ja diz por que. Um wizard que avanca com a verificacao
+    # falhando ensina o participante a ignorar a verificacao.
+    printf '\n[--] o modulo %s ainda nao passou. Voce continua nele.\n' "$_at"
+    printf '     diagnostico:\n\n'
+    _roda diagnostica "$_at" || true
+    return 1
+  fi
+}
+
 _roda() { # verbo modulo
   local _p; _p="$(_arquivo "$1" "$2")" || { _uso; exit 2; }
   if [[ -z "$_p" ]]; then
