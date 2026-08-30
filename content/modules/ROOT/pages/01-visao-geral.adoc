@@ -64,4 +64,4 @@ diferente do previsto, o bloco *"se falhar"* de cada módulo tem o diagnóstico 
 e vale lê-lo em vez de improvisar, porque erros parecidos aqui têm causas
 opostas.
 
-Siga para xref:02-ambiente.adoc[Seu ambiente].
+Siga para xref:04-arquitetura.adoc[A aplicação].

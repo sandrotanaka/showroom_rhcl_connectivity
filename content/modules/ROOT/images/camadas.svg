@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" role="img" aria-label="O que cada trilha acrescenta">
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#5b6478"/>
+    </marker>
+    <style>
+      .t1{fill:#eef4ff;stroke:#8fb0e8;stroke-width:1.5;rx:8}
+      .t2{fill:#eefaf3;stroke:#7cc39b;stroke-width:1.5;rx:8}
+      .t3{fill:#fdeff0;stroke:#dd9aa0;stroke-width:1.5;rx:8}
+      .ap{fill:#fff;stroke:#c9cfda;stroke-width:1.5;rx:8}
+      .h{font:700 13px sans-serif;fill:#14181f}
+      .q{font:italic 12px sans-serif;fill:#5b6478}
+      .i{font:11px sans-serif;fill:#3c4452}
+      .it{font:11px sans-serif;fill:#3c4452}
+      .n{font:600 11px sans-serif;fill:#7c8494;letter-spacing:.08em}
+      .ln{stroke:#5b6478;stroke-width:1.4;fill:none;marker-end:url(#a)}
+    </style>
+  </defs>
+
+  <rect class="ap" x="252" y="16" width="256" height="54"/>
+  <text class="h" x="380" y="38" text-anchor="middle">bookinfo — 6 pods, 4 linguagens</text>
+  <text class="q" x="380" y="56" text-anchor="middle">nenhuma linha muda o dia inteiro</text>
+
+  <rect class="t1" x="24" y="112" width="228" height="128"/>
+  <text class="n" x="40" y="134">TRILHA 1</text>
+  <text class="h" x="40" y="156">Procedência</text>
+  <text class="q" x="40" y="176">de onde isto veio?</text>
+  <text class="it" x="40" y="200">Pipeline valida o manifesto,</text>
+  <text class="it" x="40" y="216">espelha a imagem, assina</text>
+  <text class="it" x="40" y="232">e o Rekor registra quando.</text>
+
+  <rect class="t2" x="266" y="112" width="228" height="128"/>
+  <text class="n" x="282" y="134">TRILHA 2</text>
+  <text class="h" x="282" y="156">Service Mesh</text>
+  <text class="q" x="282" y="176">quem fala com quem?</text>
+  <text class="it" x="282" y="200">mTLS, identidade SPIFFE,</text>
+  <text class="it" x="282" y="216">grafo, trace, falha injetada,</text>
+  <text class="it" x="282" y="232">circuit breaker e canário.</text>
+
+  <rect class="t3" x="508" y="112" width="228" height="128"/>
+  <text class="n" x="524" y="134">TRILHA 3</text>
+  <text class="h" x="524" y="156">Connectivity Link</text>
+  <text class="q" x="524" y="176">quem entra e quanto pode?</text>
+  <text class="it" x="524" y="200">Duas fronteiras num hostname,</text>
+  <text class="it" x="524" y="216">chave por produto, planos</text>
+  <text class="it" x="524" y="232">comerciais e métrica de negócio.</text>
+
+  <path class="ln" d="M330 70 C240 82 180 92 138 106"/>
+  <path class="ln" d="M380 70 V106"/>
+  <path class="ln" d="M430 70 C520 82 580 92 622 106"/>
+
+  <rect class="ap" x="150" y="300" width="460" height="62"/>
+  <text class="h" x="380" y="324" text-anchor="middle">A capacidade não foi adicionada ao código.</text>
+  <text class="h" x="380" y="346" text-anchor="middle">Foi adicionada ao caminho.</text>
+  <path class="ln" d="M138 240 C160 274 240 288 292 298"/>
+  <path class="ln" d="M380 240 V294"/>
+  <path class="ln" d="M622 240 C600 274 520 288 468 298"/>
+</svg>

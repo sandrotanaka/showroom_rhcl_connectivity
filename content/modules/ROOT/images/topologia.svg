@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" role="img" aria-label="Topologia do bookinfo">
+  <defs>
+    <marker id="s" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#5b6478"/>
+    </marker>
+    <style>
+      .cx{fill:#fff;stroke:#c9cfda;stroke-width:1.5;rx:6}
+      .nm{font:600 14px sans-serif;fill:#14181f}
+      .sub{font:11px sans-serif;fill:#5b6478}
+      .lb{font:11px sans-serif;fill:#5b6478}
+      .ln{stroke:#5b6478;stroke-width:1.6;fill:none;marker-end:url(#s)}
+      .zn{fill:#f2f5f9;stroke:#c9cfda;stroke-width:1;stroke-dasharray:5 4;rx:10}
+      .zt{font:600 11px sans-serif;fill:#7c8494;letter-spacing:.08em}
+      .sc{font:9px sans-serif;fill:#a8232b}
+    </style>
+  </defs>
+
+  <rect class="zn" x="150" y="52" width="592" height="344"/>
+  <text class="zt" x="164" y="72">NAMESPACE bookinfo — TODO POD COM SIDECAR</text>
+
+  <rect class="cx" x="16" y="180" width="104" height="52"/>
+  <text class="nm" x="68" y="202" text-anchor="middle">navegador</text>
+  <text class="sub" x="68" y="219" text-anchor="middle">/productpage</text>
+
+  <rect class="cx" x="168" y="176" width="112" height="60"/>
+  <text class="nm" x="224" y="199" text-anchor="middle">gateway</text>
+  <text class="sub" x="224" y="216" text-anchor="middle">Envoy, na borda</text>
+  <text class="sc" x="224" y="230" text-anchor="middle">trilha 3 age aqui</text>
+
+  <rect class="cx" x="330" y="176" width="118" height="60"/>
+  <text class="nm" x="389" y="199" text-anchor="middle">productpage</text>
+  <text class="sub" x="389" y="216" text-anchor="middle">Python — a UI</text>
+  <text class="sc" x="389" y="230" text-anchor="middle">sa: bookinfo-productpage</text>
+
+  <rect class="cx" x="504" y="88" width="112" height="52"/>
+  <text class="nm" x="560" y="110" text-anchor="middle">details</text>
+  <text class="sub" x="560" y="127" text-anchor="middle">Ruby</text>
+
+  <rect class="cx" x="504" y="230" width="112" height="76"/>
+  <text class="nm" x="560" y="252" text-anchor="middle">reviews</text>
+  <text class="sub" x="560" y="269" text-anchor="middle">Java — v1 v2 v3</text>
+  <text class="sc" x="560" y="285" text-anchor="middle">so o peso decide</text>
+  <text class="sc" x="560" y="298" text-anchor="middle">quem recebe</text>
+
+  <rect class="cx" x="648" y="322" width="88" height="52"/>
+  <text class="nm" x="692" y="344" text-anchor="middle">ratings</text>
+  <text class="sub" x="692" y="361" text-anchor="middle">Node</text>
+
+  <path class="ln" d="M120 206 H162"/>
+  <path class="ln" d="M280 206 H324"/>
+  <path class="ln" d="M448 196 C476 196 476 114 498 114"/>
+  <path class="ln" d="M448 216 C476 216 476 268 498 268"/>
+  <path class="ln" d="M616 288 C640 288 640 344 642 344"/>
+
+  <text class="lb" x="128" y="198">HTTPS</text>
+  <text class="lb" x="286" y="198">mTLS</text>
+  <text class="lb" x="455" y="150">so o productpage</text>
+  <text class="lb" x="455" y="163">pode chamar</text>
+  <text class="lb" x="600" y="316">so o reviews</text>
+</svg>

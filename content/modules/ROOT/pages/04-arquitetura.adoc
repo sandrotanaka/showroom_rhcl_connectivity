@@ -1,0 +1,118 @@
+= A aplicação e a proposta
+:navtitle: A aplicação
+
+*Leitura: 8 minutos.* Não há comando aqui — é o mapa que faz o resto do dia ter
+sentido.
+
+== A proposta em uma frase
+
+Pegar uma aplicação que já está em produção e, **sem alterar uma linha do código
+dela**, dar-lhe procedência, identidade e valor comercial.
+
+image::camadas.svg[Cada trilha acrescenta uma camada à mesma aplicação,align="center"]
+
+Cada trilha responde a uma pergunta diferente sobre **os mesmos seis pods**. É
+por isso que a ordem importa e que nenhuma delas é opcional para a tese: sozinha,
+cada uma parece "mais uma ferramenta"; juntas, são o que se chama de plataforma.
+
+== Por que o bookinfo
+
+É a amostra canônica do Istio — provavelmente você já a viu. Escolhemos por três
+motivos práticos:
+
+[cols="1,3"]
+|===
+| *Três versões de um serviço* | o `reviews` tem v1, v2 e v3 **no ar ao mesmo tempo**. Canário só se distingue de troca de versão quando existe uma terceira versão saudável recebendo zero por cento.
+| *Prova visível* | recarregar a página muda as estrelas. Dá para verificar um exercício sem abrir terminal.
+| *Quatro linguagens* | Python, Ruby, Java e Node. Tudo o que a plataforma entrega vale para as quatro igualmente — e é isso que separa "propriedade do caminho" de "biblioteca da aplicação".
+|===
+
+== Os quatro serviços
+
+[cols="1,1,3"]
+|===
+| Serviço | Linguagem | O que faz
+
+| `productpage` | Python | a UI. É o único que o navegador vê, e o único que chama outros dois.
+| `details` | Ruby | metadados do livro. Não chama ninguém.
+| `reviews` | Java | as resenhas. *v1 sem estrelas, v2 com estrelas pretas, v3 com estrelas vermelhas.* É o único que chama o `ratings`.
+| `ratings` | Node | as notas. Ponta da cadeia.
+|===
+
+== A topologia
+
+image::topologia.svg[Topologia do bookinfo,align="center"]
+
+Três coisas para reparar no desenho, porque as três voltam como exercício:
+
+**O gateway não é da aplicação.** Ele é um Envoy na borda, e é onde a trilha 3
+decide quem entra e quanto passa. A aplicação não sabe que ele existe.
+
+**Todo pod tem um segundo contêiner.** O *sidecar* foi injetado pelo Service
+Mesh, não declarado pelo time de aplicação. É ele que faz mTLS, produz métrica e
+emite trace — sem uma linha de instrumentação nos quatro serviços.
+
+**As setas são a topologia real, não a desenhada.** Hoje só o `productpage`
+chama `details` e `reviews`, e só o `reviews` chama `ratings` — mas isso é
+verdade **por acidente**: é o que o código faz. O módulo 2.2 transforma isso em
+declaração, e você vai ver um vizinho do mesmo namespace ser recusado.
+
+== A dinâmica de uma requisição
+
+Uma chamada a `/productpage` percorre isto:
+
+[source,subs="attributes"]
+----
+navegador
+  └─ gateway (Envoy)            <1>
+       └─ productpage           <2>
+            ├─ details          <3>
+            └─ reviews (v1|v2|v3)   <4>
+                 └─ ratings     <5>
+----
+<1> decide *quem entra*: chave de API, plano comercial, limite. Duas chamadas
+    fora do processo — autorização e rate limit — que aparecem no trace com
+    tempo medido.
+<2> a única resposta que o navegador enxerga; monta a página com o que os outros
+    devolverem.
+<3> e <4> saem **em paralelo**. Se um falhar, o `productpage` ainda responde.
+<5> a decisão de qual versão do `reviews` recebe a chamada não está no código
+    nem no deploy: está num peso, fora dos dois.
+
+[NOTE]
+====
+O `reviews` degrada com elegância: se o `ratings` cair, a página carrega sem as
+notas. O `productpage` **não** degrada se o `reviews` cair. Essa assimetria não
+está escrita em documento nenhum da aplicação — você a descobre no módulo 2.5,
+injetando falha.
+====
+
+== O que cada trilha acrescenta
+
+*Trilha 1 — de onde isto veio?* Hoje as seis imagens vêm de um registry de
+terceiro, sem varredura e sem assinatura: exatamente o que a maioria das
+organizações põe em produção sem pensar. A trilha dá **procedência** — manifesto
+validado, imagem espelhada, assinada e registrada num log de transparência.
+
+*Trilha 2 — quem fala com quem aqui dentro?* A chave de API abre a porta da rua;
+não abre o cofre. A trilha instala identidade entre serviços, observabilidade sem
+instrumentação, e as ferramentas para responder *o que acontece quando quebra*.
+
+*Trilha 3 — quem entra, quanto pode, quanto vale?* A borda muda de dono: a mesma
+aplicação passa a ter duas fronteiras no mesmo hostname — UI pública, API sob
+chave — e três planos comerciais com cota e métrica.
+
+== O fecho
+
+Ao final do dia, este comando é a prova:
+
+[source,role="execute"]
+----
+oc get deploy -n bookinfo -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.template.spec.containers[0].image}{"\n"}{end}'
+----
+
+As imagens são as mesmas do começo — só a **origem** mudou, e isso foi assunto da
+trilha 1. Nada do que você vai construir hoje pediu alteração no código dos
+quatro serviços.
+
+Siga para xref:02-ambiente.adoc[Seu ambiente].
