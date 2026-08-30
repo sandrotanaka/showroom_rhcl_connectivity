@@ -88,7 +88,7 @@ oc get pods -n bookinfo -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.sp
 
 [source,role="execute"]
 ----
-bash ~/workshop/scripts/workshop.sh verifica 13
+bash ~/workshop/scripts/workshop.sh verifica 15
 ----
 
 .Se falhar
@@ -99,7 +99,7 @@ imprime sintoma, causa provável e comando:
 
 [source,role="execute"]
 ----
-bash ~/workshop/scripts/workshop.sh diagnostica 13
+bash ~/workshop/scripts/workshop.sh diagnostica 15
 ----
 
 *Os pods ficaram em `ImagePullBackOff`?* O cluster precisa de credencial para o
@@ -114,7 +114,7 @@ Para voltar ao upstream e seguir o workshop:
 
 [source,role="execute"]
 ----
-bash ~/workshop/scripts/workshop.sh corrige 13
+bash ~/workshop/scripts/workshop.sh corrige 15
 ----
 ====
 

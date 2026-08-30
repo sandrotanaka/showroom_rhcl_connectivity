@@ -73,4 +73,5 @@ bash ~/workshop/scripts/workshop.sh lista
 | `diagnostica <n>` | por que não passou: sintoma, causa provável e comando. Nunca falha.
 |===
 
-Comece por xref:02-ambiente.adoc[Seu ambiente].
+Comece pela xref:01-visao-geral.adoc[visão geral] — são cinco minutos, e é
+lá que está o cenário que dá sentido às três trilhas.

@@ -112,7 +112,7 @@ oc get route -n stackrox central -o jsonpath='https://{.spec.host}{"\n"}' 2>/dev
 
 [source,role="execute"]
 ----
-bash ~/workshop/scripts/workshop.sh verifica 12
+bash ~/workshop/scripts/workshop.sh verifica 14
 ----
 
 .Se falhar
@@ -123,7 +123,7 @@ imprime sintoma, causa provável e comando:
 
 [source,role="execute"]
 ----
-bash ~/workshop/scripts/workshop.sh diagnostica 12
+bash ~/workshop/scripts/workshop.sh diagnostica 14
 ----
 
 *Nenhuma `PipelineRun` foi criada?* O OpenShift Pipelines pode não estar
