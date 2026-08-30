@@ -259,6 +259,15 @@ spec:
           image: {{ .Values.showroom.terminal.image | quote }}
           imagePullPolicy: IfNotPresent
           env:
+            # A IMAGEM DO TERMINAL APONTA HOME PARA /data, QUE NAO EXISTE.
+            #
+            # Medido: o PVC monta em /home/lab-user (com .bashrc e o conteudo
+            # que o initContainer baixou), e 'echo $HOME' devolve /data, um
+            # caminho que nem sequer existe no container. O guia inteiro fala em
+            # ~/rhcl e ~/workshop -- sem isto, todo comando do dia cai num
+            # diretorio vazio, e 'ls ~/' nao acusa erro nenhum.
+            - name: HOME
+              value: /home/lab-user
             - name: NAMESPACE
               valueFrom:
                 fieldRef: {fieldPath: metadata.namespace}
