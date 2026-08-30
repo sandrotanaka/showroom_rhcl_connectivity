@@ -93,7 +93,6 @@ data:
     openshift_console_url: https://console-openshift-console.{{ .Values.deployer.domain }}
     repo_url: {{ .Values.plataforma.repo.url }}
     workshop_repo_url: {{ include "workshop.contentRepo" . }}
-    runner_image: {{ .Values.showroom.runnerImage }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -271,9 +270,16 @@ spec:
             - name: NAMESPACE
               valueFrom:
                 fieldRef: {fieldPath: metadata.namespace}
-            # Lido pelo scripts/workshop.sh quando o terminal nao tem Ansible.
-            - name: WORKSHOP_RUNNER_IMAGE
-              value: {{ .Values.showroom.runnerImage | quote }}
+            # Lidos pelo scripts/workshop.sh.
+            #
+            # A URL E O REF VEM DAQUI, E NAO DE 'git remote': o home e populado
+            # por TARBALL (a imagem do oc nao tem git), entao nao existe .git
+            # para consultar. Descobrir pelo remote parecia elegante e nao
+            # funciona neste caminho -- medido.
+            - name: WORKSHOP_REPO_URL
+              value: {{ include "workshop.contentRepo" . | quote }}
+            - name: WORKSHOP_REPO_REF
+              value: {{ include "workshop.contentRef" . | quote }}
           volumeMounts:
             - {name: terminal-lab-user-home, mountPath: /home/lab-user}
           ports:

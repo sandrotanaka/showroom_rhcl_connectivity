@@ -53,18 +53,15 @@ showroom:
     # playbooks Ansible com a collection kubernetes.core. A imagem padrao do
     # Showroom traz 'oc' e 'git', mas nao garante Ansible.
     #
-    # O scripts/workshop.sh detecta a ausencia e cai para um pod descartavel
-    # com imagem que tenha Ansible, usando o SEU token -- entao o workshop
-    # funciona nos dois casos. Apontar aqui uma imagem com Ansible so evita a
-    # espera do pod a cada verbo.
+    # O scripts/workshop.sh detecta a ausencia e INSTALA o Ansible no home do
+    # participante (que e PVC), uma vez, na primeira verificacao. Apontar aqui
+    # uma imagem que ja tenha Ansible evita essa espera de ~1 minuto.
     image: "quay.io/rhpds/openshift-showroom-terminal-ocp:latest"
     resources:
       requests: {cpu: "500m", memory: "512Mi"}
       limits:   {cpu: "1",    memory: "1Gi"}
     homeStorage: "5Gi"
 
-  # Imagem usada pelo fallback quando o terminal nao tem Ansible.
-  runnerImage: "quay.io/rhpds/ansible-runner-ocp:latest"
 
 # ------------------------------------------------------------------ userinfo
 # ConfigMap com o label que a RHDP le para mostrar dados ao participante.

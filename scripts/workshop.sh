@@ -126,108 +126,43 @@ EOF
 # ---------------------------------------------------------------------------
 # COMO O PLAYBOOK RODA
 #
-# Se o terminal tem ansible-playbook, roda direto -- e e o caminho normal.
+# Se o terminal tem ansible-playbook, roda direto. Se nao tem -- e a imagem
+# padrao do terminal do Showroom nao tem --, INSTALA no proprio home, uma vez.
 #
-# Se nao tem (a imagem padrao do terminal do Showroom nao garante Ansible), cai
-# para um pod descartavel que CLONA ESTE REPOSITORIO e roda o playbook la
-# dentro. Clonar, e nao mandar os arquivos numa ConfigMap: os diagnosticos fazem
-# 'import_playbook: ../comum/...', e ConfigMap nao guarda subdiretorio -- achatar
-# os nomes quebraria justamente o import.
+# POR QUE NAO UM POD DESCARTAVEL, que era o desenho anterior: ele apontava para
+# quay.io/rhpds/ansible-runner-ocp, que NAO EXISTE publicamente (o Quay responde
+# 401; a RHDP publica o Containerfile, nao a imagem). E, mesmo que existisse, o
+# modulo 1.6 usa 'oc auth can-i --as' -- que precisa do oc no PATH, e a imagem
+# de runner nao tem.
 #
-# CONSEQUENCIA A SABER: o pod roda o que esta no repositorio REMOTO. Edicao
-# local de playbook nao e vista por esse caminho.
-#
-# O POD USA O SEU TOKEN, e nao a ServiceAccount do namespace: assim o verbo mede
-# a SUA permissao (senao o modulo 1.6 estaria medindo outra identidade), e o
-# chart de deploy nao precisa de nenhum RoleBinding largo.
-#
-# LIMITE: playbooks que chamam o CLI 'oc' (o modulo 16 usa 'oc auth can-i --as')
-# dependem de oc no PATH do pod. Por isso o certo e apontar
-# showroom.terminal.image para uma imagem com Ansible, e deixar o fallback como
-# rede de seguranca -- nao como caminho principal.
-# O callback 'debug' e o que renderiza msg multilinha. Sem ele o Ansible imprime
-# o relatorio como string JSON com \n escapado -- ilegivel exatamente no momento
-# em que a pessoa mais precisa ler.
-export ANSIBLE_STDOUT_CALLBACK=debug
-export ANSIBLE_DISPLAY_SKIPPED_HOSTS=false
+# O home e PVC, entao a instalacao sobrevive a restart do pod: a espera de ~1
+# minuto acontece uma vez por ambiente, nao por comando.
+_ANSIBLE_HOME="${HOME:-/tmp}/.local"
+
+_garante_ansible() {
+  command -v ansible-playbook >/dev/null 2>&1 && return 0
+  export PATH="${_ANSIBLE_HOME}/bin:${PATH}"
+  command -v ansible-playbook >/dev/null 2>&1 && return 0
+
+  echo "(primeira vez: instalando o Ansible no seu home -- leva cerca de um minuto)"
+  python3 -m ensurepip --user >/dev/null 2>&1 || true
+  if ! python3 -m pip install --user --quiet --disable-pip-version-check \
+        ansible-core kubernetes >/dev/null 2>&1; then
+    echo "nao consegui instalar o Ansible. Sem saida para o PyPI?"
+    echo "  python3 -m pip install --user ansible-core kubernetes"
+    return 2
+  fi
+  export PATH="${_ANSIBLE_HOME}/bin:${PATH}"
+  command -v ansible-playbook >/dev/null 2>&1 || { echo "instalei e nao achei ansible-playbook no PATH"; return 2; }
+  # a collection que os playbooks usam nao vem no ansible-core
+  ansible-galaxy collection install kubernetes.core >/dev/null 2>&1 \
+    || echo "(aviso: kubernetes.core nao instalou -- as verificacoes vao falhar)"
+  echo "(pronto)"
+}
 
 _ansible() { # arquivo
-  local _p="$1"
-  if command -v ansible-playbook >/dev/null 2>&1; then
-    ansible-playbook "$_p"
-    return $?
-  fi
-
-  local _img="${WORKSHOP_RUNNER_IMAGE:-quay.io/rhpds/ansible-runner-ocp:latest}"
-  local _tok _api _repo _rev
-  _tok="$(oc whoami -t 2>/dev/null || true)"
-  _api="$(oc whoami --show-server 2>/dev/null || true)"
-  [[ -n "$_tok" && -n "$_api" ]] || { echo "sem sessao: rode 'oc login' antes"; return 2; }
-
-  _repo="${WORKSHOP_REPO_URL:-$(git -C "$_DIR" remote get-url origin 2>/dev/null || true)}"
-  _rev="${WORKSHOP_REPO_REF:-$(git -C "$_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
-  [[ -n "$_repo" ]] || { echo "nao descobri a origem do repositorio; exporte WORKSHOP_REPO_URL"; return 2; }
-
-  local _rel="${_p#"$_DIR"/}"
-  echo "(sem ansible-playbook local -- rodando em pod com ${_img})"
-  oc run "workshop-run-$$" --rm -i --restart=Never --quiet --image="$_img" \
-    --env="K8S_AUTH_API_KEY=${_tok}" \
-    --env="K8S_AUTH_HOST=${_api}" \
-    --env="K8S_AUTH_VERIFY_SSL=false" \
-    -- sh -c "git clone --depth 1 --branch '${_rev}' '${_repo}' /w >/dev/null 2>&1 \
-              && cd /w && ansible-playbook '${_rel}'"
-}
-
-# ---------------------------------------------------------------------------
-# PROGRESSO
-#
-# Um modulo so entra na lista quando a VERIFICACAO passa -- nunca por ter sido
-# aberto. Assim 'status' responde "o que eu fiz", e nao "onde eu cliquei".
-_passou()  { [[ -f "$_PROGRESSO" ]] && grep -qx "$1" "$_PROGRESSO"; }
-_marca()   { _passou "$1" || echo "$1" >> "$_PROGRESSO"; }
-_titulo()  { for _m in "${_MODULOS[@]}"; do [[ "${_m%%:*}" == "$1" ]] && { printf '%s' "${_m#*:}"; return; }; done; }
-_atual()   { for _m in "${_MODULOS[@]}"; do _passou "${_m%%:*}" || { printf '%s' "${_m%%:*}"; return; }; done; }
-
-_status() {
-  local _feitos=0 _total=0 _at; _at="$(_atual)"
-  for _m in "${_MODULOS[@]}"; do
-    local _n="${_m%%:*}" _t="${_m#*:}" _marca=" " _seta="  "
-    _total=$((_total+1))
-    if _passou "$_n"; then _marca="x"; _feitos=$((_feitos+1)); fi
-    [[ "$_n" == "$_at" ]] && _seta="->"
-    printf ' %s [%s] %-4s %s\n' "$_seta" "$_marca" "$_n" "$_t"
-  done
-  echo
-  if [[ -z "$_at" ]]; then
-    printf ' %s de %s -- acabou. Va para a conclusao do guia.\n' "$_feitos" "$_total"
-  else
-    printf ' %s de %s. Voce esta no modulo %s -- %s\n' "$_feitos" "$_total" "$_at" "$(_titulo "$_at")"
-    printf ' seguir:  bash workshop.sh proximo\n'
-  fi
-  [[ -f "$_PROGRESSO" ]] && printf ' zerar:   rm %s\n' "$_PROGRESSO"
-}
-
-_proximo() {
-  local _at; _at="$(_atual)"
-  [[ -n "$_at" ]] || { echo "nao ha proximo: todos os modulos passaram."; return 0; }
-
-  printf '\n--> verificando o modulo %s -- %s\n\n' "$_at" "$(_titulo "$_at")"
-  if _roda verifica "$_at"; then
-    _marca "$_at"
-    local _prox; _prox="$(_atual)"
-    if [[ -z "$_prox" ]]; then
-      printf '\n[ok] modulo %s fechado. Era o ultimo -- va para a conclusao.\n' "$_at"
-    else
-      printf '\n[ok] modulo %s fechado.\n     proximo: %s -- %s\n' "$_at" "$_prox" "$(_titulo "$_prox")"
-    fi
-  else
-    # NAO AVANCA, e ja diz por que. Um wizard que avanca com a verificacao
-    # falhando ensina o participante a ignorar a verificacao.
-    printf '\n[--] o modulo %s ainda nao passou. Voce continua nele.\n' "$_at"
-    printf '     diagnostico:\n\n'
-    _roda diagnostica "$_at" || true
-    return 1
-  fi
+  _garante_ansible || return $?
+  ansible-playbook "$1"
 }
 
 _roda() { # verbo modulo
