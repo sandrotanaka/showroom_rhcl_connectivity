@@ -140,7 +140,10 @@ EOF
 # O callback 'debug' e o que renderiza msg multilinha. Sem ele o Ansible imprime
 # o relatorio como string JSON com \n escapado -- ilegivel exatamente no momento
 # em que a pessoa mais precisa ler.
-export ANSIBLE_STDOUT_CALLBACK=debug
+# 'community.general.yaml' renderiza msg multilinha; o 'debug' NAO existe mais
+# no ansible-core 2.21 (medido no terminal: so default, junit, minimal, oneline
+# e tree). Por isso instalamos o pacote 'ansible' completo, e nao o core pelado.
+export ANSIBLE_STDOUT_CALLBACK=community.general.yaml
 export ANSIBLE_DISPLAY_SKIPPED_HOSTS=false
 
 # O TEMPORARIO PRECISA SAIR DE '~', E NAO E FRESCURA.
@@ -162,17 +165,20 @@ _garante_ansible() {
 
   echo "(primeira vez: instalando o Ansible no seu home -- leva cerca de um minuto)"
   python3 -m ensurepip --user >/dev/null 2>&1 || true
+  # o pacote 'ansible' (nao o 'ansible-core') traz kubernetes.core e
+  # community.general junto -- uma dependencia a menos para dar errado no meio
+  # de um workshop
   if ! python3 -m pip install --user --quiet --disable-pip-version-check \
-        ansible-core kubernetes >/dev/null 2>&1; then
+        ansible kubernetes >/dev/null 2>&1; then
     echo "nao consegui instalar o Ansible. Sem saida para o PyPI?"
-    echo "  python3 -m pip install --user ansible-core kubernetes"
+    echo "  python3 -m pip install --user ansible kubernetes"
     return 2
   fi
   export PATH="${_ANSIBLE_HOME}/bin:${PATH}"
   command -v ansible-playbook >/dev/null 2>&1 || { echo "instalei e nao achei ansible-playbook no PATH"; return 2; }
-  # a collection que os playbooks usam nao vem no ansible-core
-  ansible-galaxy collection install kubernetes.core >/dev/null 2>&1 \
-    || echo "(aviso: kubernetes.core nao instalou -- as verificacoes vao falhar)"
+  ansible-galaxy collection list kubernetes.core >/dev/null 2>&1 \
+    || ansible-galaxy collection install kubernetes.core >/dev/null 2>&1 \
+    || echo "(aviso: kubernetes.core ausente -- as verificacoes vao falhar)"
   echo "(pronto)"
 }
 
