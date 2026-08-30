@@ -117,7 +117,7 @@ ordem. Use no primeiro provisionamento de um cluster que você não montou.
 
 ## O que foi medido, e o que não foi
 
-Testado no `cluster-cxr7d` (OCP 4.21) em 2026-08-30:
+Testado num SNO OCP 4.21 em 2026-08-30 (nome do cluster omitido de proposito: cluster e efemero):
 
 | Verificação | Resultado |
 | --- | --- |
