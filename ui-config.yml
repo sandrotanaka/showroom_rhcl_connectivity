@@ -23,11 +23,21 @@ tabs:
   # nookbag usa /wetty porque o ambiente dele monta o terminal de outro jeito --
   # copiar o path de la deixa a aba muda.
   - name: Terminal
-    path: /terminal
+    path: /terminal/
     port: 443
 
-  - name: OpenShift
-    url: 'https://console-openshift-console.${DOMAIN}'
+  # O CONSOLE DO OPENSHIFT NAO PODE SER EMBUTIDO, e nao e defeito nosso.
+  #
+  # Medido: ele responde com X-Frame-Options: deny e CSP frame-ancestors 'none'.
+  # A aba abriria vazia -- e uma aba que nunca funciona custa mais do que aba
+  # nenhuma. Os modulos que precisam do console (Kiali, Traffic Graph, Traces,
+  # Policy Topology) mandam abrir em outra janela, com o endereco descoberto por
+  # 'oc whoami --show-console'.
+  #
+  # Para embutir seria preciso patchar o console do cluster para permitir
+  # framing -- e o que o workload ocp4_workload_ocp_console_embed da RHDP faz.
+  # Nao esta neste chart de proposito: mexe em configuracao de cluster para
+  # ganhar uma aba.
 
   # As tres abaixo so respondem depois que a plataforma e a aplicacao do
   # laboratorio estiverem de pe. Antes disso a aba abre e nao carrega -- e isso
