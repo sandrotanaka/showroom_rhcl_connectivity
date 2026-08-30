@@ -1,20 +1,42 @@
-# Nookbag -- painel direito do Showroom.
-# Sem tabs o painel abre em branco; o DOMAIN e resolvido em runtime.
-antora:
-  name: modules
-  dir: content
-  modules:
-    - ROOT
+---
+# Painel direito do Showroom (nookbag).
+#
+# 'type: showroom' NAO E OPCIONAL: sem ele o nookbag nao reconhece o arquivo e
+# NENHUMA aba e montada -- o painel abre e nao funciona nada, sem erro na tela.
+# Medido no cluster.
+type: showroom
+
+# 30% para o guia, 70% para o terminal e consoles.
+default_width: 30
+# Sobrevive ao F5: o participante nao perde a aba em que estava.
+persist_url_state: true
+
+view_switcher:
+  enabled: true
+  default_mode: split
 
 tabs:
+  # O TERMINAL VEM PRIMEIRO -- e de onde sai todo comando do dia.
+  #
+  # 'path: /terminal' e nao '/wetty': quem publica o terminal aqui e o nginx do
+  # chart de deploy/, e ele proxia /terminal/ para o ttyd na 7681. O template do
+  # nookbag usa /wetty porque o ambiente dele monta o terminal de outro jeito --
+  # copiar o path de la deixa a aba muda.
   - name: Terminal
-    path: /wetty
+    path: /terminal
     port: 443
-  - name: Aplicação
-    url: 'https://bookinfo.${DOMAIN}/productpage'
+
   - name: OpenShift
     url: 'https://console-openshift-console.${DOMAIN}'
-  - name: Developer Hub
-    url: 'https://developer-hub.${DOMAIN}'
+
+  # As tres abaixo so respondem depois que a plataforma e a aplicacao do
+  # laboratorio estiverem de pe. Antes disso a aba abre e nao carrega -- e isso
+  # e estado do ambiente, nao defeito do guia.
+  - name: Aplicação
+    url: 'https://bookinfo.${DOMAIN}/productpage'
+
   - name: Grafana
     url: 'https://grafana-route-grafana.${DOMAIN}'
+
+  - name: Developer Hub
+    url: 'https://developer-hub.${DOMAIN}'
