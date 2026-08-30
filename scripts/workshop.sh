@@ -89,7 +89,7 @@ sem numero, 'diagnostica' olha a plataforma inteira:
   bash workshop.sh diagnostica
 
 perdeu o lugar:
-  bash workshop.sh status
+  bash ~/workshop/scripts/workshop.sh status
 EOF
 }
 
@@ -217,7 +217,7 @@ _status() {
     printf ' %s de %s -- acabou. Va para a conclusao do guia.\n' "$_feitos" "$_total"
   else
     printf ' %s de %s. Voce esta no modulo %s -- %s\n' "$_feitos" "$_total" "$_at" "$(_titulo "$_at")"
-    printf ' seguir:  bash workshop.sh proximo\n'
+    printf ' seguir:  bash %s proximo\n' "${BASH_SOURCE[0]}"
   fi
   [[ -f "$_PROGRESSO" ]] && printf ' zerar:   rm %s\n' "$_PROGRESSO"
   return 0

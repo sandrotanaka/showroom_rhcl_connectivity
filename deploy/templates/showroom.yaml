@@ -170,6 +170,26 @@ spec:
                   echo "ok: ${_slug} -> $3"
                 else
                   echo "AVISO: nao baixei ${_slug}. Se for privado, aponte plataforma.repo.tokenSecret."
+                  # DEIXA O PORQUE NO LUGAR ONDE A PESSOA VAI PROCURAR.
+                  # Sem isto o participante recebe 'No such file or directory' --
+                  # que nao diz se ele digitou errado, se o arquivo mudou de nome
+                  # ou se o repositorio nem chegou.
+                  cat > "$3/LEIA-ME.txt" <<TXT
+Este diretorio deveria conter o repositorio da plataforma:
+  $1 (ref $2)
+
+Ele NAO foi baixado. O repositorio e privado e o ambiente subiu sem token.
+
+Consequencia: os comandos do guia que leem daqui -- preflight.sh, provision.sh,
+os manifestos do bookinfo -- nao existem nesta maquina.
+
+Como resolver, para quem monta o ambiente:
+  - marque "repositorio privado" ao pedir o item de catalogo na RHDP; ou
+  - crie um secret com o token e aponte plataforma.repo.tokenSecret no chart.
+
+Depois disso, reinicie o Showroom:
+  oc rollout restart deploy/showroom -n showroom
+TXT
                 fi
                 rm -f /tmp/r.tgz
               }
