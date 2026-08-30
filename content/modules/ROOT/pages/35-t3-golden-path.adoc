@@ -3,6 +3,32 @@
 
 *Tempo: 25 minutos*
 
+[NOTE]
+.Quem executa este módulo — e aqui são duas
+====
+Este é o único módulo com **duas** identidades, e a divisão é o conteúdo dele:
+
+[cols="1,3"]
+|===
+| *`acme-trips`* | o parceiro. Abre o _merge request_ de assinatura. **Não aprova.**
+| *`plat-eng`* | a plataforma. Aprova e faz o merge — e é o merge que chega ao cluster.
+|===
+
+Credenciais e links em xref:03-acessos.adoc[Acessos]. A mesma senha serve
+OpenShift, GitLab e Developer Hub, para as duas.
+
+Confira a assimetria antes de começar:
+
+[source,role="execute"]
+----
+oc auth can-i create authpolicy -n bookinfo --as=plat-eng
+oc auth can-i create authpolicy -n bookinfo --as=acme-trips
+----
+
+`yes` e `no`. E no GitLab é a mesma história, com outro vocabulário: *Maintainer*
+contra *Developer*.
+====
+
 Você passou o dia aplicando policies a uma aplicação que já existia. A objeção
 que sempre vem agora é: **"e o próximo serviço? alguém vai lembrar de tudo
 isso?"**

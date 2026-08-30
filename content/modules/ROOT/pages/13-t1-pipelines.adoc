@@ -3,6 +3,23 @@
 
 *Tempo: 30 minutos*
 
+[NOTE]
+.Quem executa este módulo
+====
+*`plat-eng`* — engenharia de plataforma. A credencial e os links estão em
+xref:03-acessos.adoc[Acessos]; é a mesma para OpenShift, GitLab e Developer Hub.
+
+Um parceiro não conseguiria — e dá para conferir **sem trocar de usuário**:
+
+[source,role="execute"]
+----
+oc auth can-i create pipelinerun -n travel-agency --as=plat-eng
+oc auth can-i create pipelinerun -n travel-agency --as=acme-trips
+----
+
+`yes` e `no`. A permissão vem da função, não da pessoa.
+====
+
 O Argo aplica o que está no Git. Alguém precisa decidir **o que merece entrar no
 Git** — e provar que merece. Essa é a outra metade da plataforma.
 

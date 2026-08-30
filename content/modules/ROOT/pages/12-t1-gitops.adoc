@@ -3,6 +3,23 @@
 
 *Tempo: 30 minutos*
 
+[NOTE]
+.Quem executa este módulo
+====
+*`plat-eng`* — engenharia de plataforma. A credencial e os links estão em
+xref:03-acessos.adoc[Acessos]; é a mesma para OpenShift, GitLab e Developer Hub.
+
+Um parceiro não conseguiria — e dá para conferir **sem trocar de usuário**:
+
+[source,role="execute"]
+----
+oc auth can-i patch deployment -n bookinfo --as=plat-eng
+oc auth can-i patch deployment -n bookinfo --as=acme-trips
+----
+
+`yes` e `no`. A permissão vem da função, não da pessoa.
+====
+
 No módulo anterior a aplicação subiu e você não digitou nenhum comando de deploy.
 Este módulo é sobre **quem digitou por você**, e sobre o que essa escolha custa e
 entrega.

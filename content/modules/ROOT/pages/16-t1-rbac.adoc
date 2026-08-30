@@ -3,6 +3,16 @@
 
 *Tempo: 30 minutos*
 
+[NOTE]
+.Quem executa este módulo
+====
+*`plat-eng`* — e o módulo inteiro é sobre o que as **outras três** identidades do
+ambiente não podem. Elas existem de verdade: `globex-travel`, `initech-voyages`
+e `acme-trips`, os parceiros do golden path.
+
+Credenciais em xref:03-acessos.adoc[Acessos].
+====
+
 Você já viu três respostas para "quem pode": o Argo aplica o que foi *mesclado*,
 a pipeline decide o que *merece entrar*, e a cadeia prova de *onde veio*.
 

@@ -8,12 +8,26 @@ Pode experimentar à vontade.
 
 == Exercício 1: entrar
 
-. Autentique-se no terminal ao lado:
+. Autentique-se no terminal ao lado, como *engenharia de plataforma*:
 +
 [source,role="execute",subs="attributes+"]
 ----
-oc login -u {user} -p {password} {openshift_api_url} --insecure-skip-tls-verify
+oc login -u plat-eng {openshift_api_url} --insecure-skip-tls-verify
 ----
++
+Ele pede a senha. Ela está na xref:03-acessos.adoc[folha de acessos] — um
+comando, e sai resolvida do cluster.
++
+[NOTE]
+====
+`plat-eng` é **uma credencial para tudo**: OpenShift, GitLab e Developer Hub. O
+diretório é o Keycloak, e os três delegam a ele.
+
+Há mais três identidades no ambiente — `globex-travel`, `initech-voyages` e
+`acme-trips`, os parceiros —, e elas **não podem** o que você pode. Cada módulo
+diz quem o executa, e essa assimetria é o assunto do módulo
+xref:16-t1-rbac.adoc[1.6].
+====
 
 . Os dois repositórios do dia **já estão no seu home** — foram baixados quando o
   laboratório subiu:

@@ -3,6 +3,23 @@
 
 *Tempo: 18 minutos*
 
+[NOTE]
+.Quem executa este módulo
+====
+*`plat-eng`* — engenharia de plataforma. A credencial e os links estão em
+xref:03-acessos.adoc[Acessos]; é a mesma para OpenShift, GitLab e Developer Hub.
+
+Um parceiro não conseguiria — e dá para conferir **sem trocar de usuário**:
+
+[source,role="execute"]
+----
+oc auth can-i patch virtualservice -n bookinfo --as=plat-eng
+oc auth can-i patch virtualservice -n bookinfo --as=acme-trips
+----
+
+`yes` e `no`. A permissão vem da função, não da pessoa.
+====
+
 No módulo 1.1 você recarregou a página e viu as estrelas mudarem: **90% sem
 estrelas, 10% com estrelas vermelhas, nunca pretas**. Agora dá para explicar por
 quê — e a explicação não é a que a maioria chuta.
