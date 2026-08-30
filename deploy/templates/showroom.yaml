@@ -165,7 +165,18 @@ spec:
                 esac
                 [[ -n "${TOKEN:-}" ]] && _hdr=(-H "Authorization: Bearer ${TOKEN}")
                 mkdir -p "$3"
-                if curl -sfL "${_hdr[@]}" -o /tmp/r.tgz "$_alvo" \
+                # TENTA COM TOKEN E, SE FALHAR, DE NOVO SEM ELE.
+                #
+                # O GitHub responde 401 para credencial invalida ATE em recurso
+                # publico -- entao um token errado quebra o download de um
+                # repositorio que nem precisava de token. Medido: com um
+                # placeholder no secret, o repo publico do workshop parou de
+                # baixar junto com o privado.
+                if ! curl -sfL "${_hdr[@]}" -o /tmp/r.tgz "$_alvo"; then
+                  [[ ${#_hdr[@]} -gt 0 ]] && echo "  (falhou com token; tentando sem)"
+                  curl -sfL -o /tmp/r.tgz "$_alvo" || true
+                fi
+                if [[ -s /tmp/r.tgz ]] \
                    && tar xzf /tmp/r.tgz -C "$3" --strip-components=1; then
                   echo "ok: ${_slug} -> $3"
                 else
