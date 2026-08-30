@@ -16,9 +16,15 @@ content:
     - url: .
       start_path: content
 
+# O BUNDLE DE UI DO ANTORA E O TEMA DO SHOWROOM -- nao o nookbag.
+#
+# Foi o erro que segurou a primeira subida: pus aqui o zip do nookbag, que e
+# outra coisa. O nookbag e a CASCA (abas, terminal) e chega ao container de
+# conteudo como ZT_BUNDLE, pelo chart. O tema abaixo e o que o Antora usa para
+# renderizar as paginas.
 ui:
   bundle:
-    url: https://github.com/rhpds/nookbag/releases/download/nookbag-v0.2.1/nookbag-v0.2.1.zip
+    url: https://github.com/rhpds/rhdp_showroom_theme/releases/download/latest/ui-bundle.zip
     snapshot: true
 
 asciidoc:
