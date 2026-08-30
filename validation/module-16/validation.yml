@@ -1,0 +1,69 @@
+---
+- name: "1.6 — permissao pela funcao, medida por impersonacao"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "O perfil da consumidora existe"
+      kubernetes.core.k8s_info:
+        api_version: rbac.authorization.k8s.io/v1
+        kind: Role
+        name: consumidora-de-api
+        namespace: bookinfo
+      register: r_role
+      failed_when: false
+
+    - name: "E esta ligado a alguem"
+      kubernetes.core.k8s_info:
+        api_version: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        namespace: bookinfo
+      register: r_bind
+      failed_when: false
+
+    - name: "O que a funcao PODE"
+      ansible.builtin.command: oc auth can-i list httproute -n bookinfo --as=ana.consumidora
+      register: r_pode
+      changed_when: false
+      failed_when: false
+
+    - name: "O que a funcao NAO pode"
+      ansible.builtin.command: oc auth can-i create authpolicy -n bookinfo --as=ana.consumidora
+      register: r_naopode
+      changed_when: false
+      failed_when: false
+
+    - name: "E o limite do namespace"
+      ansible.builtin.command: oc auth can-i list httproute -n travel-agency --as=ana.consumidora
+      register: r_outro
+      changed_when: false
+      failed_when: false
+
+    - name: "Consolidar"
+      ansible.builtin.set_fact:
+        _t1: "{{ (r_role.resources | default([]) | length) > 0 }}"
+        _t2: "{{ r_bind.resources | default([]) | selectattr('roleRef.name','equalto','consumidora-de-api') | list | length > 0 }}"
+        _t3: "{{ (r_pode.stdout | default('') | trim) == 'yes' }}"
+        _t4: "{{ (r_naopode.stdout | default('') | trim) == 'no' }}"
+        _t5: "{{ (r_outro.stdout | default('') | trim) == 'no' }}"
+
+    - name: "Resultado"
+      ansible.builtin.assert:
+        that: [_t1 | bool, _t2 | bool, _t3 | bool, _t4 | bool, _t5 | bool]
+        success_msg: |
+          OK Role consumidora-de-api existe
+          OK RoleBinding liga a funcao a uma pessoa
+          OK a funcao PODE listar as rotas do produto
+          OK a funcao NAO pode escrever policy de borda — a ausencia no Role e a decisao
+          OK o RoleBinding vale so no namespace onde esta
+        fail_msg: |
+          {{ 'OK  ' if _t1 else 'FALHOU' }} Role consumidora-de-api em bookinfo
+          {{ 'OK  ' if _t2 else 'FALHOU' }} RoleBinding apontando para o Role
+          {{ 'OK  ' if _t3 else 'FALHOU' }} list httproute --as=ana.consumidora deu '{{ r_pode.stdout | default('') | trim }}', esperado yes
+          {{ 'OK  ' if _t4 else 'FALHOU' }} create authpolicy --as=ana.consumidora deu '{{ r_naopode.stdout | default('') | trim }}', esperado no
+          {{ 'OK  ' if _t5 else 'FALHOU' }} list httproute em outro namespace deu '{{ r_outro.stdout | default('') | trim }}', esperado no
+
+          Aplique o perfil do modulo:
+            bash ~/workshop/scripts/workshop.sh pula 16
+          Se TUDO deu yes, provavelmente falta o --as: sobre si mesmo, um
+          administrador pode tudo, e o modulo inteiro depende da impersonacao.

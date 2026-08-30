@@ -7,6 +7,7 @@
 ** xref:13-t1-pipelines.adoc[1.3 OpenShift Pipelines]
 ** xref:14-t1-procedencia.adoc[1.4 A cadeia de suprimento]
 ** xref:15-t1-trocar-a-origem.adoc[1.5 Trocar a origem das imagens]
+** xref:16-t1-rbac.adoc[1.6 Quem pode o quê]
 * Trilha 2 — Service Mesh
 ** xref:20-t2-dentro-do-mesh.adoc[2.1 Dentro do Service Mesh]
 ** xref:21-t2-identidade.adoc[2.2 Autorização por identidade]

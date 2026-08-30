@@ -43,6 +43,7 @@ _MODULOS=(
   "13:T1 OpenShift Pipelines"
   "14:T1 A cadeia de suprimento"
   "15:T1 Trocar a origem das imagens"
+  "16:T1 Quem pode o que (RBAC)"
   "21:T2 Dentro do Service Mesh"
   "22:T2 Autorizacao por identidade"
   "23:T2 Observabilidade"

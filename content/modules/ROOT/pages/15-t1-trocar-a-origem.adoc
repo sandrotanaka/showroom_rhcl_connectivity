@@ -137,4 +137,4 @@ Com isso a trilha 1 fecha o ciclo que a auditoria pediu:
 A trilha 2 muda de pergunta: a aplicação está no ar com procedência, mas os seis
 serviços conversam entre si em texto claro e sem controle nenhum.
 
-Siga para xref:20-t2-dentro-do-mesh.adoc[Trilha 2, módulo 1].
+Siga para xref:16-t1-rbac.adoc[Módulo 1.6].

@@ -1,0 +1,72 @@
+---
+# Diagnostico do modulo 16 -- Quem pode o que
+- import_playbook: ../comum/diagnose-plataforma.yml
+
+- name: "Diagnostico — 16 Quem pode o que"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Quem sou eu, e posso impersonar?"
+      ansible.builtin.command: "{{ item }}"
+      loop:
+        - oc whoami
+        - oc auth can-i impersonate users
+        - oc auth can-i '*' '*' --all-namespaces
+      register: m_eu
+      changed_when: false
+      failed_when: false
+
+    - name: "Bindings do namespace"
+      kubernetes.core.k8s_info:
+        api_version: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        namespace: bookinfo
+      register: m_bind
+      failed_when: false
+
+    - name: "ClusterRoles com verbo de escalonamento"
+      ansible.builtin.shell: |
+        oc get clusterrole -o json | python3 -c '
+        import json,sys
+        for r in json.load(sys.stdin)["items"]:
+            for rule in r.get("rules") or []:
+                if {"escalate","bind"} & set(rule.get("verbs") or []):
+                    print(r["metadata"]["name"]); break
+        '
+      args: {executable: /bin/bash}
+      register: m_esc
+      changed_when: false
+      failed_when: false
+
+    - name: "Relatorio do modulo"
+      ansible.builtin.debug:
+        msg: |
+          ===========================================================
+          MODULO 16 — Quem pode o que
+          ===========================================================
+          voce e: {{ m_eu.results[0].stdout | default('?') }}
+          pode impersonar: {{ m_eu.results[1].stdout | default('?') | trim }}
+          e administrador: {{ m_eu.results[2].stdout | default('?') | trim }}
+
+          {% if (m_eu.results[2].stdout | default('') | trim) == 'yes' %}
+          [ ] Voce e administrador neste cluster -- normal num workshop, e
+              ESCONDE o que o modulo mostra: todo can-i sobre voce mesmo responde
+              yes. Use sempre --as. Tudo dando yes quase sempre e --as esquecido,
+              nao RBAC errado.
+          {% endif %}
+          {% if (m_eu.results[1].stdout | default('') | trim) != 'yes' %}
+          [!] Voce NAO pode impersonar, e os exercicios dependem disso. Em cluster
+              real, 'impersonate' e privilegio de investigacao e deve ser
+              auditado -- nao e um verbo comum de perfil.
+          {% endif %}
+          bindings em bookinfo: {{ m_bind.resources | default([]) | map(attribute='metadata.name') | join(', ') | default('nenhum') }}
+          {% if (m_esc.stdout | default('')) | length > 0 %}
+          [ ] ClusterRoles com 'escalate' ou 'bind':
+              {{ m_esc.stdout_lines | join(', ') | truncate(300) }}
+              Quem pode bind concede a qualquer um qualquer papel que ele mesmo
+              tenha; quem pode escalate cria papeis alem do proprio. Varios
+              destes sao do proprio OpenShift e legitimos -- o que importa e
+              nenhum perfil de APLICACAO estar nesta lista.
+          {% endif %}
+          ===========================================================

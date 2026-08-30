@@ -32,7 +32,7 @@ tickets. Se for *"o serviço já nasce com isso"*, você tem uma plataforma.
 
 | *2. Assinar uma API*
 | o `APIKey` do developer portal
-| _pull request_
+| _pull request_ — e o formato **é** a regra de acesso: a consumidora abre, `plat-eng` aprova (módulo 1.6)
 
 | *3. Publicar uma v2*
 | a v2 ao lado da v1 e o peso na `VirtualService`

@@ -12,12 +12,12 @@ Nenhuma linha do código dos seis serviços será alterada em nenhum momento.
 
 [cols="1,3,1"]
 |===
-| *Trilha 1* | *Do repositório ao cluster* — o portal, o OpenShift GitOps e o OpenShift Pipelines como soluções, e a cadeia que assina, varre e registra o que entra em produção | ~130 min
+| *Trilha 1* | *Do repositório ao cluster* — o portal, o OpenShift GitOps e o OpenShift Pipelines como soluções, a cadeia que assina, varre e registra o que entra em produção, e o RBAC que decide quem pode o quê | ~160 min
 | *Trilha 2* | *Service Mesh* — identidade, observabilidade, tracing, injeção de falha, circuit breaker e canário | ~120 min
 | *Trilha 3* | *Connectivity Link* — a borda como produto: rotas, chaves, planos, precedência e métrica de negócio | ~115 min
 |===
 
-Com o ambiente e a conclusão, são cerca de **6h30** — um dia inteiro, com intervalos. As trilhas são
+Com o ambiente e a conclusão, são cerca de **7h** — um dia inteiro, com intervalos. As trilhas são
 independentes: cada uma pressupõe o estado final da anterior, e há um comando
 que aplica esse estado para quem quiser começar no meio.
 

@@ -1,0 +1,25 @@
+---
+# 1.6 CORRIGE: remove o perfil criado no exercicio.
+- name: "1.6 — corrige (sem o perfil do exercicio)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Remover RoleBinding e Role"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: rbac.authorization.k8s.io/v1
+        kind: "{{ item.kind }}"
+        name: "{{ item.nome }}"
+        namespace: bookinfo
+      loop:
+        - {kind: RoleBinding, nome: ana-consumidora}
+        - {kind: Role, nome: consumidora-de-api}
+      loop_control: {label: "{{ item.kind }}/{{ item.nome }}"}
+
+    - name: "Explicar"
+      ansible.builtin.debug:
+        msg: |
+          Perfil removido. Sem binding, 'ana.consumidora' volta a nao poder nada
+          -- RBAC nega por padrao, e e isso que faz a ausencia de uma regra ser
+          uma decisao e nao um esquecimento.

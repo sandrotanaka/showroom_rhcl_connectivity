@@ -50,6 +50,24 @@ código; foi adicionada ao caminho.**
 
 E a quarta, que o módulo 3.6 respondeu: *o próximo serviço nasce com as três?*
 
+== As quatro identidades
+
+O dia inteiro tratou de identidade, e é fácil confundi-las — o que produz dois
+erros clássicos: dar acesso ao cluster a quem só precisava consumir a API, e
+proteger a API achando que isso protege o serviço.
+
+[cols="1,2,2"]
+|===
+| Identidade | Pergunta | Onde vive
+
+| *pessoa* | quem pode mudar a configuração? | RBAC do cluster e papel no Git (1.6)
+| *serviço* | quem pode chamar quem, aqui dentro? | SPIFFE, provado pelo mTLS (2.2)
+| *consumidor* | quem pode chamar a API, e quanto? | chave e plano comercial (3.2, 3.3)
+| *sistema* | o que este componente precisa ver? | ServiceAccount, mínima necessária (1.6)
+|===
+
+Nenhuma substitui a outra.
+
 == Três coisas que valem levar anotadas
 
 *Público não é ausência de policy.* Uma rota sem policy sob um gateway que nega

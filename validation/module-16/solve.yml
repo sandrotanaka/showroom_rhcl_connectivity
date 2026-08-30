@@ -1,0 +1,30 @@
+---
+# 1.6 PULA: cria o perfil da consumidora e o liga a uma pessoa.
+- name: "1.6 — pula (perfil por funcao aplicado)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Role e RoleBinding"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ item }}"
+      loop:
+        - apiVersion: rbac.authorization.k8s.io/v1
+          kind: Role
+          metadata: {name: consumidora-de-api, namespace: bookinfo}
+          rules:
+            # ve o produto e as rotas que o expoem; NAO ha authpolicies aqui,
+            # e a ausencia e a policy
+            - apiGroups: ["gateway.networking.k8s.io"]
+              resources: [httproutes]
+              verbs: [get, list, watch]
+            - apiGroups: ["extensions.kuadrant.io"]
+              resources: [planpolicies]
+              verbs: [get, list, watch]
+        - apiVersion: rbac.authorization.k8s.io/v1
+          kind: RoleBinding
+          metadata: {name: ana-consumidora, namespace: bookinfo}
+          subjects:
+            - {kind: User, name: ana.consumidora, apiGroup: rbac.authorization.k8s.io}
+          roleRef: {kind: Role, name: consumidora-de-api, apiGroup: rbac.authorization.k8s.io}

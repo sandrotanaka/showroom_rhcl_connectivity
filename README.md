@@ -1,6 +1,6 @@
 # Workshop — Do repositório ao produto de API
 
-Guia autoguiado de **um dia** (≈6h30 de conteúdo) sobre a plataforma de
+Guia autoguiado de **um dia** (≈7h de conteúdo) sobre a plataforma de
 aplicações da Red Hat, servido pelo Showroom. Conteúdo em **português**; nomes de
 produto e de recurso ficam em inglês (Service Mesh, Gateway, AuthPolicy).
 
@@ -12,7 +12,7 @@ código dos seis serviços é alterada em nenhum momento.
 
 | | | |
 | --- | --- | --- |
-| **1** | **Do repositório ao cluster** — portal; **OpenShift GitOps** e **OpenShift Pipelines** como soluções, com *sync* vs *health*, desvio, `selfHeal`, workspaces e results; e a cadeia que valida o manifesto, espelha a imagem, assina, registra no Rekor e varre no ACS | ~130 min |
+| **1** | **Do repositório ao cluster** — portal; **OpenShift GitOps** e **OpenShift Pipelines** como soluções, com *sync* vs *health*, desvio, `selfHeal`, workspaces e results; a cadeia que valida o manifesto, espelha a imagem, assina, registra no Rekor e varre no ACS; e o **RBAC** por função, medido com impersonação | ~160 min |
 | **2** | **Service Mesh** — mTLS, autorização por identidade SPIFFE, grafo, tracing, injeção de falha, circuit breaker e canário entre três versões | ~120 min |
 | **3** | **Connectivity Link** — duas fronteiras num hostname, chave por produto, planos comerciais, precedência auditável e métrica de negócio | ~115 min |
 
@@ -89,8 +89,8 @@ content/
   antora.yml                     atributos (hostname NUNCA fica aqui)
   modules/ROOT/
     nav.adoc                     as três trilhas
-    pages/                       22 páginas: índice, visão geral, ambiente,
-                                 18 módulos e conclusão
+    pages/                       23 páginas: índice, visão geral, ambiente,
+                                 19 módulos e conclusão
 validation/
   module-XX/
     validation.yml               verifica — afirma as tarefas do módulo
@@ -101,7 +101,7 @@ validation/
 ui-config.yml                    tabs do painel direito (nookbag)
 ```
 
-A numeração dos módulos segue a das trilhas: `11`–`15`, `21`–`27`, `31`–`36`.
+A numeração dos módulos segue a das trilhas: `11`–`16`, `21`–`27`, `31`–`36`.
 
 ## As verificações
 
