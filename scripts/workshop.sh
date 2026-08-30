@@ -137,6 +137,22 @@ EOF
 #
 # O home e PVC, entao a instalacao sobrevive a restart do pod: a espera de ~1
 # minuto acontece uma vez por ambiente, nao por comando.
+# O callback 'debug' e o que renderiza msg multilinha. Sem ele o Ansible imprime
+# o relatorio como string JSON com \n escapado -- ilegivel exatamente no momento
+# em que a pessoa mais precisa ler.
+export ANSIBLE_STDOUT_CALLBACK=debug
+export ANSIBLE_DISPLAY_SKIPPED_HOSTS=false
+
+# O TEMPORARIO PRECISA SAIR DE '~', E NAO E FRESCURA.
+#
+# O Ansible expande '~' pelo /etc/passwd do usuario, nao pelo $HOME do ambiente.
+# Na imagem do terminal o lab-user tem /data no passwd -- um diretorio que NAO
+# EXISTE no container --, entao toda execucao morre em 'Failed to create
+# temporary directory', com uma mensagem que fala de permissao e nao de caminho.
+export ANSIBLE_REMOTE_TMP="${TMPDIR:-/tmp}/.ansible-tmp"
+export ANSIBLE_LOCAL_TEMP="${TMPDIR:-/tmp}/.ansible-tmp"
+export ANSIBLE_COLLECTIONS_PATH="${HOME:-/tmp}/.ansible/collections"
+
 _ANSIBLE_HOME="${HOME:-/tmp}/.local"
 
 _garante_ansible() {
