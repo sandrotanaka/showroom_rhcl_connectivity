@@ -38,7 +38,7 @@ showroom:
     # moram juntos, entao a versao do guia acompanha a do deploy sozinha.
     repoUrl: ""
     repoRef: ""
-    antoraPlaybook: "default-site.yml"
+    antoraPlaybook: "site.yml"
     image: "quay.io/rhpds/showroom-content:v1.3.1"
 
   nookbag:

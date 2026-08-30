@@ -1,0 +1,27 @@
+# Playbook do Antora. O nome 'site.yml' e a convencao do Showroom -- e o que o
+# showroom_template_nookbag usa e o que os exemplos da RHDP trazem como default.
+#
+# ESTE ARQUIVO SEGUE O TEMPLATE DE REFERENCIA DE PROPOSITO. A primeira versao
+# tinha 'branches: HEAD', 'runtime.fetch: true' e 'output.dir', e o Antora
+# terminou com "build completed successfully" gerando ZERO paginas -- sucesso
+# silencioso e o pior modo de falha possivel. O clone do Showroom e --depth 1, e
+# mandar o Antora buscar refs num clone raso nao acha o conteudo.
+---
+site:
+  title: Do repositório ao produto de API
+  start_page: modules::index.adoc
+
+content:
+  sources:
+    - url: .
+      start_path: content
+
+ui:
+  bundle:
+    url: https://github.com/rhpds/nookbag/releases/download/nookbag-v0.2.1/nookbag-v0.2.1.zip
+    snapshot: true
+
+asciidoc:
+  attributes:
+    experimental: ''
+    source-highlighter: rouge

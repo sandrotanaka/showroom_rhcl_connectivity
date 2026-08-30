@@ -1,6 +1,8 @@
 name: modules
-title: Red Hat Connectivity Link — Workshop
-version: master
+title: Do repositório ao produto de API
+# 'version: ~' -- sem versao, como o template de referencia. Com uma versao
+# nomeada o Antora espera achar a ref correspondente no repositorio.
+version: ~
 nav:
   - modules/ROOT/nav.adoc
 asciidoc:
