@@ -56,10 +56,40 @@ Abra numa **janela separada**. O console responde `X-Frame-Options: deny` e
 recusa ser embutido, então ele não aparece nas abas ao lado.
 ====
 
+== De onde vem a credencial de cada console
+
+Elas **não vêm todas do mesmo lugar**, e é isso que costuma travar quem procura
+uma senha só:
+
+[cols="1,2,2"]
+|===
+| Console | Login | De onde sai a senha
+
+| *OpenShift* e a API
+| o usuário do laboratório
+| **da tela do serviço na RHDP** — é o único que não está no cluster. O provedor é o RHBK (OpenID), e a senha vive fora daqui.
+
+| *Argo CD*
+| `admin`
+| Secret no cluster — a folha abaixo resolve
+
+| *Grafana*
+| `admin`
+| Secret no cluster — a folha abaixo resolve
+
+| *GitLab*
+| `root`
+| Secret no cluster. As quatro personas do golden path (`globex-travel`, `initech-voyages`, `acme-trips`, `plat-eng`) têm senha própria, também na folha.
+
+| *Developer Hub*
+| **pelo GitLab**
+| não tem senha própria: você entra com uma das personas acima. É o login unificado.
+|===
+
 == A folha completa
 
-Depois do login, um comando devolve tudo o que o cluster tem: cada console com
-URL, usuário e senha.
+Depois do login, um comando devolve tudo o que está no cluster — cada console com
+URL, usuário e senha, resolvidos na hora:
 
 == Os endereços, um a um
 
@@ -73,6 +103,10 @@ Se quiser só um endereço, cada um sai de um comando:
 | `oc get route showroom -n showroom -o jsonpath='{.spec.host}'`
 | o dia inteiro
 
+| Developer Hub
+| `oc get route -A \| grep -i portal`
+| 1.1, 3.6
+
 | Console do OpenShift
 | `oc whoami --show-console`
 | 2.3, 2.4, 3.3, 3.4
@@ -80,10 +114,6 @@ Se quiser só um endereço, cada um sai de um comando:
 | A aplicação do laboratório
 | `echo https://bookinfo.$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}')/productpage`
 | 1.1, 2.5, 2.7
-
-| Developer Hub
-| `oc get route -A -l app.kubernetes.io/name=developer-hub -o jsonpath='{.items[0].spec.host}'`
-| 1.1, 3.6
 
 | Argo CD
 | `oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}'`
