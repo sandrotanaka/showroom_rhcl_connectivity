@@ -95,9 +95,13 @@ plataforma:
     # mensagem dizendo isso -- e nao com 'could not read Username', que fala de
     # terminal e manda depurar o lado errado.
     #
+    # Nome do secret com o PAT de leitura. E 'optional: true' no pod, entao
+    # apontar um secret que ainda nao existe nao quebra nada -- o download
+    # simplesmente falha com a mensagem que explica o que fazer.
+    #
     # Deixe vazio para o Job usar o secret que a propria RHDP cria quando voce
     # marca "repositorio privado" no formulario do pedido.
-    tokenSecret: ""
+    tokenSecret: "plataforma-git"
     tokenKey: "password"
 
   # A imagem do cluster tem oc, python3, curl, openssl e tar -- e NAO tem git.
