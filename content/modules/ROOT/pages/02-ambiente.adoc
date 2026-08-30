@@ -15,15 +15,30 @@ Pode experimentar à vontade.
 oc login -u {user} -p {password} {openshift_api_url} --insecure-skip-tls-verify
 ----
 
-. Traga os dois repositórios do dia — o da plataforma, de onde vêm os scripts, e
-  o deste workshop, de onde vêm as verificações:
+. Os dois repositórios do dia **já estão no seu home** — foram baixados quando o
+  laboratório subiu:
 +
-[source,role="execute",subs="attributes+"]
+[source,role="execute"]
 ----
-git clone {repo_url} ~/rhcl
-git clone {workshop_repo_url} ~/workshop
-cd ~/rhcl
+ls ~/rhcl ~/workshop && cd ~/rhcl
 ----
++
+[cols="1,3"]
+|===
+| `~/rhcl` | a plataforma: os scripts, os manifestos e as amostras
+| `~/workshop` | este workshop: as verificações e o `workshop.sh`
+|===
++
+[NOTE]
+====
+Você não clona nada, e isso não é conveniência: o repositório da plataforma é
+privado, e um `git clone` pediria uma credencial que você não tem — falhando com
+uma mensagem sobre *terminal*, não sobre permissão.
+====
++
+Os scripts descobrem hostname, release e credenciais **do cluster, na hora**.
+Nenhum tem endereço embutido, e é por isso que funcionam no seu cluster e no de
+todos os outros participantes ao mesmo tempo.
 
 . Descubra o domínio de apps **do cluster** — você vai usá-lo o dia inteiro:
 +

@@ -91,7 +91,7 @@ data:
     cluster_domain: {{ .Values.deployer.domain }}
     openshift_api_url: {{ .Values.deployer.apiUrl }}
     openshift_console_url: https://console-openshift-console.{{ .Values.deployer.domain }}
-    repo_url: {{ include "workshop.contentRepo" . }}
+    repo_url: {{ .Values.plataforma.repo.url }}
     workshop_repo_url: {{ include "workshop.contentRepo" . }}
     runner_image: {{ .Values.showroom.runnerImage }}
 ---
@@ -141,6 +141,55 @@ spec:
     spec:
       serviceAccountName: {{ $nome }}
       initContainers:
+        # O HOME DO TERMINAL JA CHEGA COM OS DOIS REPOSITORIOS.
+        #
+        # Sem isto o modulo 02 mandaria o participante clonar -- e o repositorio
+        # da plataforma e PRIVADO: o clone pediria credencial que ele nao tem, e
+        # a mensagem falaria de terminal e nao de permissao. Aqui o download usa
+        # o mesmo token do provisionamento, uma vez, na subida do pod.
+        #
+        # curl + tar, e nao git: e a mesma razao do Job -- a imagem do 'oc' do
+        # cluster nao tem git (medido, nao suposto).
+        - name: prepara-home
+          image: {{ .Values.plataforma.image | quote }}
+          command: [/bin/bash, -c]
+          args:
+            - |
+              set -uo pipefail
+              _baixa() { # url ref destino
+                local _slug _host _alvo _hdr=()
+                _slug="$(printf '%s' "$1" | sed -E 's|^https?://[^/]+/||; s|\.git$||')"
+                _host="$(printf '%s' "$1" | sed -E 's|^https?://([^/]+)/.*|\1|')"
+                case "$_host" in
+                  github.com) _alvo="https://api.github.com/repos/${_slug}/tarball/${2}" ;;
+                  *)          _alvo="${1%.git}/-/archive/${2}/${2}.tar.gz" ;;
+                esac
+                [[ -n "${TOKEN:-}" ]] && _hdr=(-H "Authorization: Bearer ${TOKEN}")
+                mkdir -p "$3"
+                if curl -sfL "${_hdr[@]}" -o /tmp/r.tgz "$_alvo" \
+                   && tar xzf /tmp/r.tgz -C "$3" --strip-components=1; then
+                  echo "ok: ${_slug} -> $3"
+                else
+                  echo "AVISO: nao baixei ${_slug}. Se for privado, aponte plataforma.repo.tokenSecret."
+                fi
+                rm -f /tmp/r.tgz
+              }
+              _baixa {{ .Values.plataforma.repo.url | quote }} {{ .Values.plataforma.repo.ref | quote }} /home/lab-user/rhcl
+              _baixa {{ include "workshop.contentRepo" . | quote }} {{ include "workshop.contentRef" . | quote }} /home/lab-user/workshop
+              # uid aleatorio + grupo root e o padrao do OpenShift: sem isto o
+              # terminal abre os arquivos e nao consegue escrever neles.
+              chmod -R g+rwX /home/lab-user 2>/dev/null || true
+          env:
+            {{- if .Values.plataforma.repo.tokenSecret }}
+            - name: TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.plataforma.repo.tokenSecret }}
+                  key: {{ .Values.plataforma.repo.tokenKey | default "password" }}
+                  optional: true
+            {{- end }}
+          volumeMounts:
+            - {name: terminal-lab-user-home, mountPath: /home/lab-user}
         - name: git-cloner
           image: "quay.io/rhpds/git-cloner:v1.1.2"
           env:

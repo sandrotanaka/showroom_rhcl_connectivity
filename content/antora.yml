@@ -13,8 +13,9 @@ asciidoc:
     user: '%ATTR_NOT_SET%'
     password: '%ATTR_NOT_SET%'
     # Fixos do workshop
-    repo_url: 'https://github.com/sandrotanaka/rhcl-connectivity-demo'
-    workshop_repo_url: 'https://github.com/sandrotanaka/showroom_rhcl_connectivity'
+    # Substituidos em runtime pelo user_data.yml do chart de deploy/.
+    repo_url: 'https://github.com/devhub-tanaka/rhcl-connectivity-demo'
+    workshop_repo_url: 'https://github.com/devhub-tanaka/showroom_rhcl_connectivity'
     overlay: 'overlays/rhcl-1.4'
     experimental: ''
     source-highlighter: rouge
