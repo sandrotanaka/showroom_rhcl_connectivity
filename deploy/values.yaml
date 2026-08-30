@@ -74,3 +74,43 @@ userinfo:
   instructions: >-
     Abra o guia do laboratório e siga a partir de "Seu ambiente". O terminal
     fica na aba ao lado; todo comando do dia sai de lá.
+
+# ---------------------------------------------------------------- plataforma
+# O CI Field Content entrega um cluster com RHBK, Lightspeed e OpenShift GitOps
+# -- e mais nada. Tudo o que o workshop pressupoe e montado por um Job, na ordem
+# de docs/PROVISIONING-1.4.md.
+plataforma:
+  enabled: true
+
+  # completo  Service Mesh + Connectivity Link + Pipelines + portal + GitLab,
+  #           Quay, ACS e RHTAS. Libera os modulos 1.4 e 1.5. LENTO e pesado.
+  # leve      sem GitLab/Quay/ACS: os modulos 1.4 e 1.5 ficam indisponiveis.
+  perfil: completo
+
+  # check  nao instala nada; diz o que falta e em que ordem. Use no primeiro
+  #        provisionamento de um cluster que voce nao montou.
+  modo: apply
+
+  repo:
+    url: "https://github.com/devhub-tanaka/rhcl-connectivity-demo"
+    ref: "main"
+    # O repositorio da plataforma e PRIVADO. Sem token, o Job para com uma
+    # mensagem dizendo isso -- e nao com 'could not read Username', que fala de
+    # terminal e manda depurar o lado errado.
+    #
+    # Deixe vazio para o Job usar o secret que a propria RHDP cria quando voce
+    # marca "repositorio privado" no formulario do pedido.
+    tokenSecret: ""
+    tokenKey: "password"
+
+  # A imagem do cluster tem oc, python3, curl, openssl e tar -- e NAO tem git.
+  # Por isso o repositorio vem por tarball, o que de quebra resolve o caso do
+  # repositorio privado sem precisar de credential helper.
+  image: "image-registry.openshift-image-registry.svc:5000/openshift/cli:latest"
+
+  # O perfil completo sobe GitLab, Quay e ACS. Nao e exagero: cada um traz
+  # banco proprio.
+  timeoutSegundos: 14400
+  recursos:
+    requests: {cpu: "200m", memory: "512Mi"}
+    limits:   {cpu: "2",    memory: "2Gi"}

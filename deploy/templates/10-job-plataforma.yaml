@@ -1,0 +1,77 @@
+{{- if .Values.plataforma.enabled }}
+---
+# O bootstrap vem do PROPRIO chart (.Files.Get), e nao de um segundo clone:
+# assim a ordem de provisionamento e a versao do chart nunca divergem, e o Job
+# nao depende de mais um repositorio estar acessivel.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bootstrap-plataforma
+  namespace: {{ .Values.showroom.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+data:
+  bootstrap.sh: |
+{{ .Files.Get "bootstrap.sh" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: monta-plataforma
+  namespace: {{ .Values.showroom.namespace }}
+  labels:
+    demo.redhat.com/application: "workshop"
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    # Hook de Sync, e nao objeto comum: um Job e imutavel, e sem o hook um
+    # segundo sync falharia tentando alterar o spec de um Job existente.
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: {{ .Values.plataforma.timeoutSegundos }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: monta-plataforma
+    spec:
+      serviceAccountName: provisionador
+      restartPolicy: Never
+      containers:
+        - name: bootstrap
+          image: {{ .Values.plataforma.image | quote }}
+          command: [/bin/bash, -c]
+          args:
+            - exec bash /bootstrap/bootstrap.sh
+          env:
+            - name: PERFIL
+              value: {{ .Values.plataforma.perfil | quote }}
+            - name: MODO
+              value: {{ .Values.plataforma.modo | quote }}
+            - name: REPO_DIR
+              value: "/plataforma"
+            - name: PLATAFORMA_REPO
+              value: {{ .Values.plataforma.repo.url | quote }}
+            - name: PLATAFORMA_REF
+              value: {{ .Values.plataforma.repo.ref | quote }}
+            {{- if .Values.plataforma.repo.tokenSecret }}
+            - name: PLATAFORMA_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.plataforma.repo.tokenSecret }}
+                  key: {{ .Values.plataforma.repo.tokenKey | default "password" }}
+                  optional: true
+            {{- end }}
+            # provision.sh descobre o cluster sozinho; nada de hostname aqui.
+            - name: NEXUS_EULA_ACCEPT
+              value: "true"
+          volumeMounts:
+            - {name: fonte, mountPath: /plataforma}
+            - {name: bootstrap, mountPath: /bootstrap, readOnly: true}
+          resources:
+            {{- toYaml .Values.plataforma.recursos | nindent 12 }}
+      volumes:
+        - {name: fonte, emptyDir: {}}
+        - name: bootstrap
+          configMap: {name: bootstrap-plataforma, defaultMode: 0555}
+{{- end }}

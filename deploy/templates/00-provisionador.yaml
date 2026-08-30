@@ -1,0 +1,36 @@
+{{- if .Values.plataforma.enabled }}
+{{- $ns := .Values.showroom.namespace }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: provisionador
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+---
+# CLUSTER-ADMIN, E A DECISAO E DELIBERADA.
+#
+# O Job instala operadores, cria namespaces, escreve CRs de Service Mesh e de
+# Connectivity Link e configura monitoring do cluster. Nao existe recorte de
+# RBAC que faca isso e ainda seja "minimo" -- um perfil que instala operador ja
+# pode conceder qualquer papel (o verbo 'bind' do modulo 1.6).
+#
+# O que MITIGA: a identidade e do provisionamento, nao do participante. Ele
+# trabalha com o proprio login, e o Showroom tem apenas 'edit' no namespace
+# dele. Cluster efemero, de uma pessoa so, destruido ao fim.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: provisionador-{{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: provisionador
+    namespace: {{ $ns }}
+{{- end }}

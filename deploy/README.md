@@ -86,12 +86,65 @@ helm template t deploy/ \
   --set gitops.repoURL=https://github.com/<org>/showroom_rhcl_connectivity
 ```
 
-## O que não foi medido em cluster
+## A plataforma: o cluster do catálogo chega vazio
 
-Este chart nunca subiu na RHDP. Os pontos a verificar na primeira execução, em
-ordem de risco:
+O item entrega **RHBK, OpenShift Lightspeed e OpenShift GitOps**. Só. O workshop
+pressupõe Service Mesh, Connectivity Link, Pipelines, portal e — no perfil
+completo — GitLab, Quay, ACS e RHTAS.
 
-1. o fallback de Ansible (pod, token, clone) — nunca executou;
-2. `default-site.yml` renderizando as 23 páginas no construtor do Antora;
-3. o `ConfigMap` de `userinfo` sendo lido pela RHDP e aparecendo na tela do
-   serviço.
+Por isso o chart traz um `Job` (`sync-wave: 0`) que roda
+[`bootstrap.sh`](bootstrap.sh), embutido no próprio chart por `.Files.Get` para
+que ordem de provisionamento e versão do chart nunca divirjam.
+
+### Por que um bootstrap, e não `provision.sh` direto
+
+`provision.sh` sem argumento roda as 17 etapas de uma vez — e `credenciais`
+escreve secrets **no namespace do portal**, que ainda não existe. A sequência do
+bootstrap é a de `docs/PROVISIONING-1.4.md`, com `identity` **antes** do portal
+(o `install.sh` precisa do segredo do client que essa etapa cria).
+
+### Perfis
+
+| | |
+| --- | --- |
+| `leve` | Service Mesh, Connectivity Link, Pipelines e portal sobre o GitOps que já vem. Os módulos 1.4 e 1.5 ficam indisponíveis. |
+| `completo` | acrescenta GitLab, Quay, ACS e RHTAS. Libera 1.4 e 1.5. **Lento e pesado** — as três etapas trazem banco próprio. |
+
+### `modo: check`
+
+Não instala nada: roda `provision.sh --check`, que diz o que falta e em que
+ordem. Use no primeiro provisionamento de um cluster que você não montou.
+
+## O que foi medido, e o que não foi
+
+Testado no `cluster-cxr7d` (OCP 4.21) em 2026-08-30:
+
+| Verificação | Resultado |
+| --- | --- |
+| Binários da imagem `openshift/cli` do cluster | `oc`, `python3`, `curl`, `openssl`, `tar`, `bash` presentes; **`git` ausente** |
+| Download e extração do repositório por tarball | funciona (testado com repositório público) |
+| Repositório privado sem token | falha com mensagem própria, e não com `could not read Username` |
+| `helm lint` e `helm template` | passam |
+
+**A imagem não ter `git` mudou o desenho**: o repositório da plataforma vem por
+`curl` + `tar`, e não por clone — o que de quebra resolve o repositório privado
+sem *credential helper*. O `initContainer` de clone, que era a primeira versão,
+falhava com `could not read Username for 'https://github.com'`, uma mensagem
+sobre terminal que manda depurar o lado errado de um problema de permissão.
+
+**O repositório da plataforma é privado.** Sem token, o Job para logo no começo.
+Marque "repositório privado" ao pedir o item de catálogo — o `bootstrap.sh` lê o
+secret que a própria RHDP cria — ou monte um secret e aponte
+`plataforma.repo.tokenSecret`.
+
+### Ainda não medido, em ordem de risco
+
+1. **O provisionamento completo de ponta a ponta** — o `bootstrap.sh` nunca rodou
+   em modo `apply` num cluster virgem. É onde estão as etapas lentas.
+2. **Os plugins do portal** (`build-plugins.sh --publish`, `build-cl-ops.sh`)
+   exigem Node 22 e publicação em registry: são passos de laptop, não de Job. Sem
+   eles o portal sobe e o workshop funciona — o que se perde são abas, não
+   exercícios.
+3. O fallback de Ansible do `workshop.sh` (pod, token, clone).
+4. `default-site.yml` renderizando as 23 páginas no construtor do Antora.
+5. O `ConfigMap` de `userinfo` aparecendo na tela do serviço.

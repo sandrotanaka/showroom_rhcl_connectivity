@@ -62,10 +62,12 @@ O serviço novo já tem tudo o que você aplicou à mão hoje:
 
 [source,role="execute"]
 ----
-NS=<o namespace que você criou>
-oc get peerauthentication,authorizationpolicy -n $NS     # trilha 2
-oc get httproute,authpolicy,planpolicy -n $NS            # trilha 3
-oc get application -n openshift-gitops | grep $NS        # trilha 1
+NS=$(oc get authpolicy -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"\n"}{end}' \
+     | sort -u | grep -vE '^(bookinfo|travel-agency|echo-api|ingress-gateway)$' | head -1)
+echo "API criada em: ${NS:-nenhuma encontrada}"
+oc get peerauthentication,authorizationpolicy -n "$NS"    # trilha 2
+oc get httproute,authpolicy,planpolicy -n "$NS"           # trilha 3
+oc get application -n openshift-gitops | grep "$NS"       # trilha 1
 ----
 
 == Exercício 4: do portal ao IDE
