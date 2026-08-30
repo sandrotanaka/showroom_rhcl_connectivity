@@ -1,0 +1,77 @@
+{{- if .Values.showroom.acessos.enabled }}
+{{- $sa := .Values.showroom.name }}
+{{- $ns := .Values.showroom.namespace }}
+---
+# PARA A FOLHA DE ACESSOS FUNCIONAR ANTES DO LOGIN.
+#
+# O problema que isto resolve: o terminal fala com o cluster pela ServiceAccount
+# do Showroom, que so enxerga o proprio namespace. O 'acessos.sh' rodado ali
+# devolve uma folha vazia -- e o participante precisa da folha JUSTAMENTE para
+# descobrir como entrar. Circulo fechado.
+#
+# O QUE NAO FIZEMOS, e por que: dar cluster-admin a SA resolveria com uma linha
+# e tornaria o terminal administrador antes de qualquer login -- inclusive
+# quebrando a premissa do modulo 1.6, que ensina impersonacao porque VOCE e
+# admin e a SA nao e.
+#
+# Entao: rotas em todo lugar (endereco nao e segredo) e Secret SO nos namespaces
+# que a folha realmente le. Um namespace novo com credencial nova nao entra de
+# graca -- precisa ser acrescentado aqui, conscientemente.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: showroom-acessos-{{ $ns }}
+rules:
+  - apiGroups: ["route.openshift.io"]
+    resources: [routes]
+    verbs: [get, list]
+  - apiGroups: ["config.openshift.io"]
+    resources: [ingresses, clusterversions]
+    verbs: [get, list]
+  - apiGroups: ["user.openshift.io"]
+    resources: [users]
+    verbs: [get, list]
+  - apiGroups: ["config.openshift.io"]
+    resources: [oauths]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: showroom-acessos-{{ $ns }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: showroom-acessos-{{ $ns }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $sa }}
+    namespace: {{ $ns }}
+{{- range .Values.showroom.acessos.namespaces }}
+---
+# Secret, um namespace por vez -- e cada um esta aqui porque a folha o le.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: showroom-le-secret
+  namespace: {{ . }}
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: showroom-le-secret
+  namespace: {{ . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: showroom-le-secret
+subjects:
+  - kind: ServiceAccount
+    name: {{ $sa }}
+    namespace: {{ $ns }}
+{{- end }}
+{{- end }}

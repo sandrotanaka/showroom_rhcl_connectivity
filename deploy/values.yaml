@@ -63,6 +63,23 @@ showroom:
     homeStorage: "5Gi"
 
 
+  # A FOLHA DE ACESSOS FUNCIONANDO ANTES DO LOGIN.
+  #
+  # Sem isto o terminal le so o proprio namespace, e o 'acessos.sh' devolve uma
+  # folha vazia -- justamente o que o participante abre para descobrir como
+  # entrar. Rotas em todo lugar (endereco nao e segredo) e Secret SO nos
+  # namespaces listados.
+  #
+  # Acrescente um namespace aqui quando a folha passar a ler credencial dele.
+  acessos:
+    enabled: true
+    namespaces:
+      - gitlab-system      # root do GitLab e as personas
+      - openshift-gitops   # admin do Argo CD
+      - keycloak           # admin inicial do RHBK
+      - monitoring         # admin do Grafana
+      - kuadrant-system    # as chaves de API dos parceiros
+
   # CREDENCIAIS DO PARTICIPANTE.
   #
   # Num pedido pela RHDP elas chegam pelo formulario e o Showroom as injeta
