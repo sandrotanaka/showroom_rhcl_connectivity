@@ -17,6 +17,35 @@ que o objeto foi aceito e sai — *fire and forget*. Ele não espera sync nem
 health, e o `remove_workload` do role não está implementado: quem limpa é o
 cluster morrendo.
 
+## Subir à mão, fora do catálogo
+
+Enquanto o item de catálogo não existe, o guia sobe com um comando — e ele
+descobre tudo do cluster, sem hostname escrito:
+
+```bash
+helm template w deploy/ \
+  --set plataforma.enabled=false \
+  --set deployer.domain=$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}') \
+  --set deployer.apiUrl=$(oc whoami --show-server) \
+  --set gitops.repoURL=https://github.com/<org>/showroom_rhcl_connectivity \
+  | oc apply -f -
+```
+
+`plataforma.enabled=false` porque, subindo à mão, a plataforma é montada pelo
+`provision.sh` — o Job só faz sentido no caminho do catálogo.
+
+E o secret do repositório privado, que o `initContainer` e o Job leem:
+
+```bash
+printf 'cole o PAT: '; read -rs PAT; echo
+oc create secret generic plataforma-git -n showroom --from-literal=password="$PAT"
+unset PAT
+oc rollout restart deploy/showroom -n showroom
+```
+
+> O `read -p` do zsh **não** é prompt — ali `-p` significa "ler de coprocesso", e
+> o comando falha deixando a variável vazia. O `printf` antes evita isso.
+
 ## O que o chart entrega
 
 | | |
