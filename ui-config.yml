@@ -48,5 +48,7 @@ tabs:
   - name: Grafana
     url: 'https://grafana-route-grafana.${DOMAIN}'
 
+  # 'rhcl-portal', e nao 'developer-hub': o host da rota vem do install.sh do
+  # RHDH deste projeto, e nao do nome do operador. Medido -- a aba abria vazia.
   - name: Developer Hub
-    url: 'https://developer-hub.${DOMAIN}'
+    url: 'https://rhcl-portal.${DOMAIN}'
