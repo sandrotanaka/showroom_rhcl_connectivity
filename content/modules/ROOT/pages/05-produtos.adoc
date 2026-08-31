@@ -1,0 +1,164 @@
+= Service Mesh e Connectivity Link
+:navtitle: Os dois produtos
+
+*Leitura: 10 minutos.* Não há comando aqui. É a página que responde à pergunta
+que a sala faz sozinha no meio do dia: **por que dois produtos, se os dois fazem
+policy de tráfego?**
+
+== O fato que organiza tudo
+
+É o **mesmo Envoy**.
+
+O gateway `prod-web` não é um produto separado plantado na borda: é um `Gateway`
+do Istio, materializado pela `gatewayClassName: istio` que o Service Mesh
+fornece. O Connectivity Link **anexa policies a ele**.
+
+[IMPORTANT]
+====
+Não é integração entre dois produtos. É o **mesmo plano de dados com dois
+escopos de policy** — um deles voltado para quem chega de fora, outro para quem
+já está dentro.
+====
+
+Isso tem uma consequência prática que vale antes de qualquer comparação:
+**Connectivity Link depende de Service Mesh**, não é alternativa a ele. Sem uma
+`GatewayClass` que materialize o Gateway, não há onde anexar policy nenhuma.
+
+== A divisão, em uma tabela
+
+[cols="2,1,2"]
+|===
+| A pergunta | Quem responde | Com o quê
+
+| Quem é o **cliente** que está entrando?
+| Connectivity Link
+| `AuthPolicy` — chave de API, JWT, OIDC
+
+| Quanto esse cliente **pode consumir**, por contrato?
+| Connectivity Link
+| `PlanPolicy`, `RateLimitPolicy`
+
+| Quanto isso **vale em dinheiro**?
+| Connectivity Link
+| `TelemetryPolicy` — a dimensão `plan` na métrica
+
+| Quem é o **serviço** que está chamando?
+| Service Mesh
+| `PeerAuthentication` + `AuthorizationPolicy`, por identidade SPIFFE
+
+| **Qual versão** recebe a chamada?
+| Service Mesh
+| `VirtualService` e `DestinationRule`
+
+| O que acontece **quando quebra**?
+| Service Mesh
+| injeção de falha, `connectionPool`, `outlierDetection`
+
+| O que aconteceu, e onde o tempo foi?
+| *os dois*
+| métricas e trace do Envoy — a mesma fonte
+|===
+
+Uma frase resume: o Connectivity Link responde **quem entra, quanto pode e
+quanto custa**; o Service Mesh responde **quem fala com quem, em qual versão e o
+que acontece quando quebra**.
+
+== Onde eles se sobrepõem — e como escolher
+
+Esta é a parte que confunde, porque os dois **de fato** sabem fazer as mesmas
+quatro coisas. A escolha não é técnica: é de escopo.
+
+=== Autenticação
+
+[cols="1,2,2"]
+|===
+| | Service Mesh | Connectivity Link
+
+| Objeto
+| `RequestAuthentication`
+| `AuthPolicy`
+
+| Identidade
+| do **serviço** (SPIFFE, provada por mTLS) ou JWT
+| do **consumidor** (chave de API, JWT, OIDC)
+
+| Vem com
+| nada além da validação
+| developer portal, emissão e aprovação de chave, `APIProduct`
+|===
+
+*Regra prática:* se a resposta a "quem é?" precisa aparecer numa fatura ou num
+contrato, é Connectivity Link. Se ela só precisa existir dentro do cluster, é
+Service Mesh.
+
+=== Autorização
+
+O Service Mesh compara **identidade de carga de trabalho**: a
+`AuthorizationPolicy` do `discounts` aceita um SPIFFE ID e recusa todos os
+outros, inclusive um serviço do mesmo namespace.
+
+O Connectivity Link compara **identidade de consumidor**: a chave pertence a um
+parceiro, que pertence a um plano.
+
+São perguntas diferentes sobre a mesma requisição. No módulo
+xref:21-t2-identidade.adoc[2.2] você vê as duas na mesma chamada: ela
+passou pela chave de API na borda **e mesmo assim** é recusada lá dentro.
+
+=== Limite de tráfego
+
+[cols="1,2"]
+|===
+| Service Mesh | `connectionPool` protege o **chamador** de um chamado lento. Não é cota; é fila.
+| Connectivity Link | `RateLimitPolicy` e `PlanPolicy` são **cota de contrato**, contadas por plano num serviço distribuído (Limitador), com janela e cota diária.
+|===
+
+O Istio até sabe limitar taxa por filtro de Envoy — mas o contador é local ao
+pod, e "3 requisições por 10 segundos" vira "3 por pod". Cota comercial precisa
+de contador compartilhado, e é isso que o Connectivity Link traz.
+
+=== TLS
+
+O Service Mesh cuida do **mTLS entre serviços**, com rotação de certificado que
+ninguém opera. O Connectivity Link cuida do **TLS de borda** e do certificado do
+hostname público.
+
+Não se sobrepõem de fato: são trechos diferentes do mesmo caminho.
+
+== Onde eles se encontram
+
+No `Gateway`. É o único objeto que os dois tocam:
+
+* o **Service Mesh** o materializa — cria o Deployment do Envoy, o Service, o
+  certificado interno;
+* o **Connectivity Link** anexa policies a ele — e a `AuthPolicy` de escopo de
+  gateway vale para toda rota anexada que não declare a sua.
+
+É por isso que o módulo xref:33-t3-precedencia.adoc[3.4] existe: quando duas
+policies miram o mesmo tráfego, o campo de status **nomeia quem venceu**.
+
+== O erro que essa confusão produz
+
+Duplicar a mesma regra nas duas camadas.
+
+Autenticar o consumidor na borda **e** de novo entre serviços parece defesa em
+profundidade e é, na prática, duas fontes de verdade para a mesma pergunta — com
+o agravante de que elas divergem em silêncio. Quando a requisição é recusada,
+ninguém sabe qual camada recusou sem ler duas configurações.
+
+A pergunta que separa: *esta regra é sobre **quem pediu** ou sobre **quem
+executa**?* Uma resposta por camada, sempre.
+
+== O que cada um não faz
+
+**O Connectivity Link não protege o que está dentro.** A chave de API abre a
+porta da rua. Um serviço comprometido dentro do namespace continua podendo o que
+a `AuthorizationPolicy` permitir — e é por isso que a trilha 2 existe.
+
+**O Service Mesh não sabe o que é um cliente.** Ele conhece cargas de trabalho,
+não contratos. Não há como perguntar a ele quanto o plano *silver* consumiu no
+mês.
+
+**Nenhum dos dois altera a aplicação.** É o que os torna combináveis: as duas
+camadas são propriedades do caminho, e o código não sabe que elas existem.
+
+Siga para xref:02-ambiente.adoc[Seu ambiente].

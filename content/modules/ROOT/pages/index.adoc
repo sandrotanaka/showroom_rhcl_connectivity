@@ -17,7 +17,7 @@ Nenhuma linha do código dos seis serviços será alterada em nenhum momento.
 | *Trilha 3* | *Connectivity Link* — a borda como produto: rotas, chaves, planos, precedência e métrica de negócio | ~115 min
 |===
 
-Com o ambiente e a conclusão, são cerca de **7h** — um dia inteiro, com intervalos. As trilhas são
+Com o ambiente, as páginas de contexto e a conclusão, são cerca de **7h20** — um dia inteiro, com intervalos. As trilhas são
 independentes: cada uma pressupõe o estado final da anterior, e há um comando
 que aplica esse estado para quem quiser começar no meio.
 

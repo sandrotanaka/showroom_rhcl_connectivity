@@ -1,6 +1,7 @@
 * xref:index.adoc[Boas-vindas]
 * xref:01-visao-geral.adoc[Visão geral]
 * xref:04-arquitetura.adoc[A aplicação]
+* xref:05-produtos.adoc[Os dois produtos]
 * xref:02-ambiente.adoc[Seu ambiente]
 * xref:03-acessos.adoc[Acessos]
 * Trilha 1 — Do repositório ao cluster

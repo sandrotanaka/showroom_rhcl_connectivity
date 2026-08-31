@@ -117,4 +117,4 @@ As imagens são as mesmas do começo — só a **origem** mudou, e isso foi assu
 trilha 1. Nada do que você vai construir hoje pediu alteração no código dos
 quatro serviços.
 
-Siga para xref:02-ambiente.adoc[Seu ambiente].
+Siga para xref:05-produtos.adoc[Os dois produtos].
