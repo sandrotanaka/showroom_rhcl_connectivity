@@ -1,7 +1,7 @@
 = 2.5 Fault injection
 :navtitle: 2.5 Fault injection
 
-*Tempo: 18 minutos*
+*Tempo: 24 minutos*
 
 [NOTE]
 .Quem executa este módulo
@@ -25,9 +25,10 @@ ninguém testa antes da madrugada de domingo é: **e quando não funciona?**
 
 == Objetivos
 
-* Injetar falha num serviço sem alterá-lo nem derrubá-lo.
+* Injetar as **duas** formas de falha do Istio — erro e atraso — sem alterar o
+  serviço nem derrubá-lo.
 * Observar a degradação na interface, no grafo e no trace.
-* Distinguir degradação graciosa de falha em cascata.
+* Usar o atraso para demonstrar *timeout*, que o erro não permite demonstrar.
 
 == Exercício 1: derrubar o `ratings`, sem derrubar o `ratings`
 
@@ -87,20 +88,83 @@ do Service Mesh. O Service Mesh permitiu que você a *testasse*.
   duração é **curta** — a falha foi injetada antes da rede, não depois de um
   timeout.
 
-== Exercício 4: reverter
+== Exercício 4: a outra falha — atraso
+
+Erro e atraso são as **duas** formas de `fault` do Istio, e ensinam coisas
+diferentes. Um serviço fora falha rápido; um serviço lento é pior, porque o
+chamador fica esperando e a fila sobe.
+
+. Remova o erro e injete **5 segundos de atraso em metade das chamadas**:
++
+[source,role="execute"]
+----
+oc delete virtualservice ratings-falha -n bookinfo --ignore-not-found
+oc apply -f - <<'YAML'
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: ratings-atraso
+  namespace: bookinfo
+spec:
+  hosts: [ratings]
+  http:
+    - fault:
+        delay:
+          percentage: {value: 50}
+          fixedDelay: 5s
+      route:
+        - destination: {host: ratings}
+YAML
+----
+
+. Recarregue a página algumas vezes. **Metade** das vezes ela demora — e o
+  tempo é do `reviews` esperando, não do `ratings` trabalhando.
+
+. Agora abra um trace no *Observe → Traces*. O atraso aparece **no span da
+  chamada**, com a duração medida. Compare com o exercício 1: lá o span era
+  curto e com erro; aqui é longo e bem-sucedido.
++
+Essa é a diferença que o grafo sozinho não mostra: os dois casos aparecem como
+"problema no `ratings`", e as causas são opostas.
+
+== Exercício 5: o atraso torna o *timeout* demonstrável
+
+Com `abort`, um `timeout` nunca é atingido — o erro volta na hora. Com atraso,
+ele passa a fazer sentido.
+
+. Declare um limite **menor que o atraso**:
++
+[source,role="execute"]
+----
+oc patch virtualservice ratings-atraso -n bookinfo --type=json   -p '[{"op":"add","path":"/spec/http/0/timeout","value":"2s"}]'
+----
+
+. Recarregue. Onde antes demorava 5 segundos, agora **corta em 2** e devolve
+  erro — e a página volta a degradar como no exercício 1, só que por decisão de
+  quem configurou, e não por defeito.
+
+[IMPORTANT]
+====
+É aqui que *timeout* deixa de ser configuração de biblioteca e vira política do
+caminho: o valor está num objeto, vale para qualquer chamador, e não exige que
+as quatro linguagens da aplicação concordem sobre como implementá-lo.
+====
+
+== Exercício 6: reverter
 
 [source,role="execute"]
 ----
-oc delete virtualservice ratings-falha -n bookinfo
+oc delete virtualservice ratings-falha ratings-atraso -n bookinfo --ignore-not-found
 ----
 
 [WARNING]
 ====
-Não use este cenário para demonstrar *retry* ou *timeout*. Os dois testes óbvios
-falham em silêncio: um `retry` sobre uma falha injetada em 100% das chamadas
-repete o mesmo erro, e um `timeout` sobre um `abort` imediato nunca é atingido.
-Para exercitar retry é preciso injetar **atraso**, não erro — e aí o próximo
-módulo é um lugar melhor para a conversa.
+Não use o **`abort`** para demonstrar *retry* ou *timeout*. Os dois testes
+óbvios falham em silêncio: um `retry` sobre falha em 100% das chamadas repete o
+mesmo erro, e um `timeout` sobre um `abort` imediato nunca é atingido.
+
+Para os dois é preciso injetar **atraso** — que é o exercício 4, e o motivo de
+ele existir.
 ====
 
 == Verificação

@@ -52,7 +52,7 @@ Isso tem uma consequência prática que vale antes de qualquer comparação:
 
 | O que acontece **quando quebra**?
 | Service Mesh
-| injeção de falha, `connectionPool`, `outlierDetection`
+| injeção de falha — **erro** e **atraso** —, `timeout`, `connectionPool`, `outlierDetection`
 
 | O que aconteceu, e onde o tempo foi?
 | *os dois*

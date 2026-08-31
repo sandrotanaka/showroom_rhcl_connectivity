@@ -12,7 +12,7 @@
         kind: VirtualService
         namespace: bookinfo
         name: "{{ item }}"
-      loop: [ratings-falha, ratings-lento]
+      loop: [ratings-falha, ratings-atraso, ratings-lento]
 
     - name: "Restaurar a VirtualService de canario da amostra"
       kubernetes.core.k8s:

@@ -20,7 +20,7 @@
         kind: VirtualService
         namespace: bookinfo
         name: "{{ item }}"
-      loop: [ratings-lento, ratings-falha]
+      loop: [ratings-lento, ratings-atraso, ratings-falha]
 
     - name: "Restaurar as DestinationRule da amostra"
       kubernetes.core.k8s:
