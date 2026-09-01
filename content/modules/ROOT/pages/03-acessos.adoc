@@ -92,38 +92,52 @@ oc get route -A | grep -i <nome>
 ----
 ====
 
-== De onde vem a senha de cada um
+== Uma credencial para tudo
 
-Elas **não vêm todas do mesmo lugar**, e é isso que trava quem procura uma senha
-só:
+O Keycloak é o **diretório único** do ambiente, e quase todas as portas delegam
+a ele:
 
-[cols="1,1,2"]
+[cols="1,3"]
 |===
-| Console | Usuário | De onde sai a senha
+| Entram pelo Keycloak | OpenShift e a API, Developer Hub, Argo CD, GitLab, Dev Spaces, SonarQube (SAML), ACS (OIDC)
+| Ainda com admin local | Grafana, Quay, Nexus, e o próprio console do Keycloak
+|===
 
-| *OpenShift* e a API
-| o do laboratório
-| **da tela do serviço na RHDP** — o único que não está no cluster. O provedor é o Keycloak, e a senha vive fora daqui.
+A **mesma senha** abre quase tudo. Os administradores locais — `root` do GitLab,
+`admin` do Argo — continuam existindo como *break-glass*: a rede de segurança
+para o dia em que a federação sair errada e trancar o login de todos.
 
-| *Keycloak (RHBK)*
-| `admin`
-| `oc extract secret/keycloak-initial-admin -n keycloak --to=-`
+[IMPORTANT]
+====
+A senha do **seu** usuário é a única que não está no cluster: o provedor é o
+Keycloak, e ela vem da tela do serviço na RHDP. Todo o resto — inclusive as
+credenciais de *break-glass* — a folha resolve com um comando.
+====
 
-| *Argo CD*
-| `admin`
-| Secret no cluster — a folha abaixo resolve
+=== Quem é quem
 
-| *Grafana*
-| `admin`
-| Secret no cluster — a folha abaixo resolve
+[cols="1,3"]
+|===
+| `plat-eng` | **a persona do workshop.** Engenharia de plataforma: escreve policy, provisiona, aprova merge. É com ela que os módulos são feitos.
+| `globex-travel`, `initech-voyages`, `acme-trips` | os parceiros. Consomem a API e abrem *merge request*; **não aprovam** e não configuram o cluster.
+| `tanaka` | quem **monta e conduz** o ambiente — papel máximo em toda porta. Não é a identidade do participante: com ela, a assimetria que o módulo xref:16-t1-rbac.adoc[1.6] ensina desaparece.
+|===
 
-| *GitLab*
-| `root`
-| Secret no cluster. As quatro personas do golden path (`globex-travel`, `initech-voyages`, `acme-trips`, `plat-eng`) têm senha própria, também na folha.
+== Os consoles de CI/CD
 
-| *Developer Hub*
-| **uma persona do GitLab**
-| não tem senha própria — é o login unificado.
+Estes quatro não têm hostname previsível — descubra e abra:
+
+[source,role="execute"]
+----
+oc get route -A | grep -iE 'sonarqube|nexus|quay|central'
+----
+
+[cols="1,3"]
+|===
+| *SonarQube* | portão de qualidade da pipeline. Entra **pelo Keycloak (SAML)**; o `admin` local é break-glass.
+| *ACS (Central)* | varredura de imagem. Entra **pelo Keycloak (OIDC)**.
+| *Quay* | o registry do cluster, onde a imagem assinada é publicada. Admin local.
+| *Nexus* | artefatos versionados. Admin local — e **recusa toda escrita com `403` até o EULA ser aceito**, que é ato de licenciamento e não tem script.
 |===
 
 == As quatro personas do golden path

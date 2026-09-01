@@ -20,8 +20,9 @@ comando, e sai resolvida do cluster.
 +
 [NOTE]
 ====
-`plat-eng` é **uma credencial para tudo**: OpenShift, GitLab e Developer Hub. O
-diretório é o Keycloak, e os três delegam a ele.
+`plat-eng` é **uma credencial para tudo**: OpenShift, Developer Hub, Argo CD,
+GitLab, Dev Spaces, SonarQube e ACS. O diretório é o Keycloak, e todos delegam a
+ele — os administradores locais que sobram existem como *break-glass*.
 
 Há mais três identidades no ambiente — `globex-travel`, `initech-voyages` e
 `acme-trips`, os parceiros —, e elas **não podem** o que você pode. Cada módulo
