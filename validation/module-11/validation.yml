@@ -20,25 +20,34 @@
       register: r_appset
       ignore_errors: true
 
-    - name: Consolidar
+    # CONTAR PELO istio-proxy NOS initContainers, e nao por spec.containers.
+    #
+    # O sidecar aqui e NATIVO: o istio-proxy e um initContainer com
+    # restartPolicy Always. Com o Service Mesh funcionando, spec.containers diz
+    # 1 -- e o 2/2 do 'oc get' vem do READY, que conta o sidecar nativo.
+    # Contar pelo spec da zero e manda conferir o label de injecao, que esta
+    # certo. E a armadilha 5.5 do CONHECIMENTO, e eu cai nela.
+    - name: Contar os pods com sidecar injetado
       ansible.builtin.set_fact:
-        _com_sidecar: "{{ r_pods.resources | default([])
-                          | selectattr('spec.containers','defined')
-                          | selectattr('spec.containers','length_is',2) | list }}"
+        _n_sidecar: "{{ _n_sidecar | default(0) | int + 1 }}"
+      loop: "{{ r_pods.resources | default([]) }}"
+      loop_control:
+        label: "{{ item.metadata.name }}"
+      when: "'istio-proxy' in (item.spec.initContainers | default([]) | map(attribute='name') | list)"
 
     - name: Resultado
       ansible.builtin.assert:
         that:
-          - _com_sidecar | length >= 6
+          - _n_sidecar | default(0) | int >= 6
           - r_appset.resources | default([]) | length > 0
         success_msg: |
-          OK {{ _com_sidecar | length }} pods com sidecar injetado (2/2)
+          OK {{ _n_sidecar | default(0) }} pods com o sidecar injetado
           OK ApplicationSet presente — quem aplica daqui em diante e o Argo
         fail_msg: |
-          {{ 'OK  ' if _com_sidecar | length >= 6 else 'FALHOU' }} pods 2/2 encontrados: {{ _com_sidecar | length }}
+          {{ 'OK  ' if _n_sidecar | default(0) | int >= 6 else 'FALHOU' }} pods com sidecar: {{ _n_sidecar | default(0) }}
           {{ 'OK  ' if r_appset.resources | default([]) | length > 0 else 'FALHOU' }} ApplicationSet em openshift-gitops
 
           Suba a amostra:
             cd ~/rhcl && SAMPLES=bookinfo bash scripts/provision.sh samples
-          Pods 1/2 significam sidecar nao injetado -- confira o label do namespace:
+          Sem sidecar, confira o label do NAMESPACE (annotation de pod nao injeta):
             oc get ns bookinfo --show-labels

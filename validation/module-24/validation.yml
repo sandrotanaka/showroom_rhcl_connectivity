@@ -12,7 +12,10 @@
       ignore_errors: true
 
     - name: "Existe uma instancia do Tempo no cluster"
-      ansible.builtin.command: oc get pods -A -l app.kubernetes.io/name=tempo --no-headers
+      # O label NAO e 'name=tempo': o operador rotula o pod como
+      # 'name=tempo-monolithic' (ou tempo-distributed). O componente e
+      # estavel entre os dois modos.
+      ansible.builtin.command: oc get pods -A -l app.kubernetes.io/component=tempo --no-headers
       register: r_tempo
       changed_when: false
       failed_when: false
