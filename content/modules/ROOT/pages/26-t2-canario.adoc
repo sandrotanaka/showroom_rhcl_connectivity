@@ -132,6 +132,20 @@ oc get virtualservice reviews -n bookinfo -o jsonpath='{.spec.http[0].route}' | 
 ----
 ====
 
+[TIP]
+.O mesmo exercício no upstream
+====
+O upstream move o tráfego entre as mesmas `v1` e `v3` do `reviews`, e o primeiro
+passo dele é o mesmo 50/50 que você acabou de aplicar. Depois ele vai direto a
+100% na `v3`.
+
+A diferença que interessa está antes do exercício: aqui a `v3` já vinha
+recebendo 10%, e a `v2` continua no ar com zero. Canário é isso — a versão nova
+existe, é saudável e recebe pouco. Ir de 50% a 100% é *promover*, não *canariar*.
+
+https://istio.io/latest/docs/tasks/traffic-management/traffic-shifting/[Istio · Traffic Shifting,window=_blank]
+====
+
 == O que isso significa
 
 Nenhuma imagem foi trocada, nenhuma réplica foi escalada, nenhum deploy

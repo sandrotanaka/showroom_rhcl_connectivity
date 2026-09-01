@@ -17,14 +17,35 @@ cada uma parece "mais uma ferramenta"; juntas, são o que se chama de plataforma
 
 == Por que o bookinfo
 
-É a amostra canônica do Istio — provavelmente você já a viu. Escolhemos por três
-motivos práticos:
+É a amostra canônica do Istio — provavelmente você já a viu. Ela vem do projeto
+Istio, mantida em
+https://istio.io/latest/docs/examples/bookinfo/[istio.io/docs/examples/bookinfo,window=_blank],
+e é usada aqui **como o upstream a publica**: mesmos serviços, mesmas três
+versões do `reviews`, mesmos manifestos de aplicação.
+
+[NOTE]
+.O que é do upstream e o que é nosso
+====
+A aplicação é do projeto Istio (_Istio Authors_, Apache 2.0). Nada do código
+dela foi alterado — e essa é a condição do exercício, não uma economia: a tese
+do dia é que procedência, identidade e valor comercial se acrescentam **por
+fora**.
+
+O que este workshop acrescenta são as camadas: as policies do Service Mesh, as
+do Connectivity Link, o pipeline e o catálogo. Elas não existem no upstream.
+
+Se quiser comparar exercício a exercício, a
+https://istio.io/latest/docs/tasks/[lista de tasks do Istio,window=_blank] cobre
+o mesmo terreno da trilha 2 sem nada de OpenShift em volta.
+====
+
+Escolhemos por três motivos práticos:
 
 [cols="1,3"]
 |===
 | *Três versões de um serviço* | o `reviews` tem v1, v2 e v3 **no ar ao mesmo tempo**. Canário só se distingue de troca de versão quando existe uma terceira versão saudável recebendo zero por cento.
 | *Prova visível* | recarregar a página muda as estrelas. Dá para verificar um exercício sem abrir terminal.
-| *Quatro linguagens* | Python, Ruby, Java e Node. Tudo o que a plataforma entrega vale para as quatro igualmente — e é isso que separa "propriedade do caminho" de "biblioteca da aplicação".
+| *Quatro linguagens* | Python, Ruby, Java e Node — o upstream chama a aplicação de _polyglot_, e é de propósito. Tudo o que a plataforma entrega vale para as quatro igualmente — e é isso que separa "propriedade do caminho" de "biblioteca da aplicação".
 |===
 
 == Os quatro serviços
@@ -35,7 +56,7 @@ motivos práticos:
 
 | `productpage` | Python | a UI. É o único que o navegador vê, e o único que chama outros dois.
 | `details` | Ruby | metadados do livro. Não chama ninguém.
-| `reviews` | Java | as resenhas. *v1 sem estrelas, v2 com estrelas pretas, v3 com estrelas vermelhas.* É o único que chama o `ratings`.
+| `reviews` | Java | as resenhas. *v1 não chama o `ratings` e não mostra estrelas; v2 chama e mostra estrelas pretas; v3 chama e mostra estrelas vermelhas.* É o único que chama o `ratings`.
 | `ratings` | Node | as notas. Ponta da cadeia.
 |===
 

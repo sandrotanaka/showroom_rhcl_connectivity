@@ -91,7 +91,14 @@ configuração gerada; é um campo que você lê com `oc get`.
 | Red Hat OpenShift Service Mesh | https://docs.redhat.com/en/documentation/red_hat_openshift_service_mesh
 | Kuadrant (upstream) | https://docs.kuadrant.io
 | Gateway API | https://gateway-api.sigs.k8s.io
+| A aplicação, no upstream | https://istio.io/latest/docs/examples/bookinfo/
+| Os mesmos exercícios, sem OpenShift | https://istio.io/latest/docs/tasks/
 |===
+
+O `bookinfo` é do projeto Istio (_Istio Authors_, Apache 2.0) e foi usado aqui
+sem nenhuma alteração no código. Refazer as tasks do Istio no seu tempo é o
+melhor jeito de separar **o que é Istio** do que a plataforma acrescentou por
+cima — que é exatamente a distinção que a trilha 2 e a trilha 3 fazem.
 
 [IMPORTANT]
 ====

@@ -164,6 +164,20 @@ bash ~/workshop/scripts/workshop.sh corrige 26
 ----
 ====
 
+[TIP]
+.O mesmo exercício no upstream
+====
+O upstream **não** usa o bookinfo neste: ele abre o circuito com o `fortio`
+contra o `httpbin`, um alvo feito para apanhar. O `DestinationRule` e os campos
+de `connectionPool` e `outlierDetection` são os mesmos — muda o que gera a
+carga.
+
+Isto é o que separa uma amostra de uma demonstração: no upstream você vê o
+circuito abrir; aqui você vê **quem** ele protegeu.
+
+https://istio.io/latest/docs/tasks/traffic-management/circuit-breaking/[Istio · Circuit Breaking,window=_blank]
+====
+
 == O que isso significa
 
 Resiliência costuma ser escrita como biblioteca dentro de cada aplicação — e

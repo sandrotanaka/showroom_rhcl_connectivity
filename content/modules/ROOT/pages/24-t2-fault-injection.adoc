@@ -197,6 +197,29 @@ oc get virtualservice -n bookinfo
 ----
 ====
 
+[TIP]
+.O mesmo exercício no upstream
+====
+Mesmo alvo, o `ratings`, e o mesmo objeto — um `VirtualService`. Os números
+diferem de propósito, e vale saber por quê:
+
+[cols="1,1,1"]
+|===
+| | upstream | aqui
+
+| erro | `500` em 100% | `503` em 100%
+| atraso | `7s` em 100% | `5s` em 50%
+| para quem | só o usuário `jason` | todo mundo
+|===
+
+O upstream escopa a falha por cabeçalho (`end-user: jason`) porque a amostra
+dele tem tela de login. Aqui não há login, então a falha vale para todos — e o
+atraso fica em metade dos pedidos justamente para você **ver a diferença** entre
+o pedido lento e o rápido na mesma sessão.
+
+https://istio.io/latest/docs/tasks/traffic-management/fault-injection/[Istio · Fault Injection,window=_blank]
+====
+
 == O que isso significa
 
 Testar comportamento de falha normalmente exige um ambiente de caos, um agente
