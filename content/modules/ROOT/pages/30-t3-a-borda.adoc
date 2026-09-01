@@ -44,28 +44,31 @@ acesso — e para isso a borda precisa mudar de dono.
 oc get gateway -A
 ----
 
-== Exercício 1: o conflito que precisa ser resolvido à mão
+== Exercício 1: as duas fronteiras convivem
 
-A `HTTPRoute` do upstream já casa `/api/v1/products`. Se as duas camadas
-convivessem, esse caminho passaria pelo gateway da amostra — **sem chave** —
-enquanto o resto de `/api/v1` passaria pelo `prod-web` com chave.
+A aplicação continua respondendo pelo gateway dela, e a camada de plataforma
+sobe **ao lado**, em outro hostname. Nada é apagado.
 
-Uma API vendida com um caminho aberto por acidente é pior do que uma API aberta,
-porque ninguém sabe.
-
-. Confira o que a rota do upstream casa:
+. Veja as duas rotas do upstream:
 +
 [source,role="execute"]
 ----
-oc get httproute bookinfo -n bookinfo -o jsonpath='{.spec.rules[*].matches}' | python3 -m json.tool
+oc get httproute -n bookinfo
+oc get route -n bookinfo
 ----
 
-. Remova-a:
-+
-[source,role="execute"]
-----
-oc delete httproute bookinfo -n bookinfo
-----
+[IMPORTANT]
+====
+Não tente apagar a `HTTPRoute` do upstream para "liberar" o caminho. Duas
+razões, e as duas foram medidas:
+
+* o `ApplicationSet` a **recria em segundos** — o que está no Git é o que vale;
+* e o hostname `bookinfo.<domínio>` é servido por uma `Route` do OpenShift que
+  aponta para o gateway da amostra. A decisão acontece na **borda**, antes de
+  qualquer policy: o pedido nunca chegaria ao `prod-web`.
+
+Comparar as duas lado a lado é demonstração melhor do que trocar uma pela outra.
+====
 
 == Exercício 2: as rotas novas
 
@@ -102,13 +105,21 @@ diretório direto publicaria o literal no hostname.
 [source,role="execute"]
 ----
 D=$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}')
-curl -sk -o /dev/null -w 'UI pelo prod-web -> %{http_code}\n' "https://bookinfo.$D/productpage"
+curl -sk -o /dev/null -w 'UI pelo prod-web -> %{http_code}\n' "https://bookinfo-rhcl.$D/productpage"
 ----
 
-. Você deve ver **`401`**.
+. Você deve ver **`403`**.
 
 Não é erro seu. É a plataforma funcionando exatamente como foi configurada — e
 o próximo módulo é sobre por quê.
+
+[NOTE]
+====
+`403`, e não `401`: a recusa é de **autorização**, não de autenticação. O
+gateway não está dizendo *"quem é você?"* — está dizendo *"não decidi que você
+pode"*. A diferença aparece no corpo da resposta, que traz a mensagem do
+operador do gateway.
+====
 
 == Verificação
 
@@ -150,7 +161,7 @@ diferentes**. O da aplicação pertence ao time que a escreveu; o da plataforma
 pertence a quem responde por quem entra, quanto passa e quanto isso custa.
 
 Mover a rota de um para o outro é o momento em que uma aplicação vira um
-**produto**. E o `401` que você acabou de receber é a primeira prova de que a
+**produto**. E o `403` que você acabou de receber é a primeira prova de que a
 mudança de dono foi real.
 
 Siga para xref:31-t3-duas-fronteiras.adoc[Módulo 3.2].

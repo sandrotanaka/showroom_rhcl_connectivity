@@ -13,16 +13,16 @@
 
     - name: "A UI responde sem chave"
       ansible.builtin.uri:
-        url: "https://bookinfo.{{ r_ing.resources[0].spec.domain }}/productpage"
+        url: "https://bookinfo-rhcl.{{ r_ing.resources[0].spec.domain }}/productpage"
         validate_certs: false
-        status_code: [200, 401, 429]
+        status_code: [200, 401, 403, 429]
       register: r_ui
 
     - name: "A API sem chave e recusada"
       ansible.builtin.uri:
-        url: "https://bookinfo.{{ r_ing.resources[0].spec.domain }}/api/v1/products"
+        url: "https://bookinfo-rhcl.{{ r_ing.resources[0].spec.domain }}/api/v1/products"
         validate_certs: false
-        status_code: [200, 401, 429]
+        status_code: [200, 401, 403, 429]
       register: r_api
 
     - name: "Consolidar"
@@ -40,6 +40,7 @@
           {{ 'OK  ' if _t1 else 'FALHOU' }} UI sem chave devolveu {{ r_ui.status }} (esperado 200)
           {{ 'OK  ' if _t2 else 'FALHOU' }} API sem chave devolveu {{ r_api.status }} (esperado 401)
 
-          UI em 401 significa que ela nao declarou policy propria e caiu no
-          prod-web-deny-all -- publico e uma decisao, nao um esquecimento:
+          UI em 403 significa que ela nao declarou policy propria e caiu no
+          prod-web-deny-all -- que recusa por AUTORIZACAO, nao por identidade.
+          Publico e uma decisao, nao um esquecimento:
             bash ~/workshop/scripts/workshop.sh pula 32

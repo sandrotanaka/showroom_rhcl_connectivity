@@ -20,7 +20,10 @@
 
     - name: "Consolidar (2)"
       ansible.builtin.set_fact:
-        _sem_upstream: "{{ 'bookinfo' not in _nomes }}"
+        # A rota do upstream CONTINUA existindo, e e assim que tem de ser: as
+        # duas camadas convivem em hostnames diferentes. Ate 2026-09-01 esta
+        # verificacao exigia que ela sumisse -- e o ApplicationSet a recriava.
+        _sem_upstream: true
 
     - name: "Resultado"
       ansible.builtin.assert:
@@ -31,11 +34,10 @@
           OK a rota do upstream saiu (nao ha mais caminho aberto por acidente)
           OK {{ _no_prodweb | length }} rota(s) no prod-web: {{ _no_prodweb | map(attribute='metadata.name') | join(' ') }}
         fail_msg: |
-          {{ 'OK  ' if _sem_upstream else 'FALHOU' }} a HTTPRoute 'bookinfo' do upstream saiu
+          {{ 'OK  ' if _sem_upstream else 'FALHOU' }} as duas camadas convivem (a do upstream permanece)
           {{ 'OK  ' if _no_prodweb | length >= 2 else 'FALHOU' }} rotas no prod-web: {{ _no_prodweb | length }}
 
-          A rota do upstream ja casa /api/v1/products -- com ela no ar, esse
-          caminho passa SEM chave enquanto o resto passa com chave:
-            oc delete httproute bookinfo -n bookinfo
-          Depois aplique as rotas novas (elas trazem __DOMAIN__):
+          As rotas da camada de plataforma usam bookinfo-rhcl.<dominio>, com
+          Route propria -- nada precisa ser apagado. Aplique-as (elas trazem
+          __DOMAIN__):
             bash ~/workshop/scripts/workshop.sh pula 31

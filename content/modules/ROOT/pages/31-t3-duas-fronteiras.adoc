@@ -20,7 +20,7 @@ oc auth can-i create authpolicies -n bookinfo --as=acme-trips
 `yes` e `no`. A permissão vem da função, não da pessoa.
 ====
 
-A UI responde `401`. A pergunta que isso levanta é melhor do que o erro: **por
+A UI responde `403`. A pergunta que isso levanta é melhor do que o erro: **por
 que uma rota sem policy nenhuma é negada?**
 
 == Objetivos
@@ -81,7 +81,7 @@ YAML
 [source,role="execute"]
 ----
 D=$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}')
-curl -sk -o /dev/null -w 'UI -> %{http_code}\n' "https://bookinfo.$D/productpage"
+curl -sk -o /dev/null -w 'UI -> %{http_code}\n' "https://bookinfo-rhcl.$D/productpage"
 ----
 
 . Você deve ver `200`.
@@ -109,7 +109,7 @@ oc apply -f ~/rhcl/samples/bookinfo/rhcl/26-identity-apikeys.yaml
 [source,role="execute"]
 ----
 D=$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}')
-curl -sk -o /dev/null -w 'API sem chave -> %{http_code}\n' "https://bookinfo.$D/api/v1/products"
+curl -sk -o /dev/null -w 'API sem chave -> %{http_code}\n' "https://bookinfo-rhcl.$D/api/v1/products"
 ----
 
 . Com chave:
@@ -118,7 +118,7 @@ curl -sk -o /dev/null -w 'API sem chave -> %{http_code}\n' "https://bookinfo.$D/
 ----
 KEY=$(oc get secret -n kuadrant-system -l app=partner,devportal.kuadrant.io/apiproduct=bookinfo-api \
   -o jsonpath='{.items[0].data.api_key}' | base64 -d)
-curl -sk -o /dev/null -w 'API com chave -> %{http_code}\n' "https://bookinfo.$D/api/v1/products?APIKEY=$KEY"
+curl -sk -o /dev/null -w 'API com chave -> %{http_code}\n' "https://bookinfo-rhcl.$D/api/v1/products?APIKEY=$KEY"
 ----
 
 . Agora tente a mesma chave contra a UI, e depois uma chave de **outro** produto
@@ -144,7 +144,7 @@ imprime sintoma, causa provável e comando:
 bash ~/workshop/scripts/workshop.sh diagnostica 32
 ----
 
-*A UI continua em `401` depois da policy anônima?* Confira se ela foi aceita e
+*A UI continua em `403` depois da policy anônima?* Confira se ela foi aceita e
 está valendo:
 
 [source,role="execute"]

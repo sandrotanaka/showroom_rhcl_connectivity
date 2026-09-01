@@ -70,6 +70,7 @@ separada** — o painel ao lado só embute o que permite ser embutido.
 
 | *OpenShift* | {openshift_console_url}[console] | 2.3, 2.4, 3.3, 3.4
 | *A aplicação* | https://bookinfo.{cluster_domain}/productpage[bookinfo] | 1.1, 2.5, 2.7
+| *A mesma, pela plataforma* | https://bookinfo-rhcl.{cluster_domain}/productpage[bookinfo-rhcl] | trilha 3 — mesma app, outra fronteira
 | *Developer Hub* | https://rhcl-portal.{cluster_domain}[portal] | 1.1, 3.6
 | *Argo CD* | https://openshift-gitops-server-openshift-gitops.{cluster_domain}[Argo CD] | 1.2
 | *GitLab* | https://gitlab.{cluster_domain}[GitLab] | 1.1, 1.6

@@ -18,7 +18,7 @@
             -o jsonpath='{.items[0].data.api_key}' 2>/dev/null | base64 -d)
           [ -z "$KEY" ] && continue
           for i in $(seq 1 12); do
-            curl -sk -o /dev/null "https://bookinfo.${D}/api/v1/products?APIKEY=${KEY}"
+            curl -sk -o /dev/null "https://bookinfo-rhcl.${D}/api/v1/products?APIKEY=${KEY}"
           done
           sleep 11
         done

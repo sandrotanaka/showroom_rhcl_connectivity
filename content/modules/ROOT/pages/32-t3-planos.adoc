@@ -65,7 +65,7 @@ for tier in free silver gold; do
     -o jsonpath='{.items[0].data.api_key}' | base64 -d)
   printf '%-8s ' "$tier"
   for i in $(seq 1 14); do
-    curl -sk -o /dev/null -w '%{http_code} ' "https://bookinfo.$D/api/v1/products?APIKEY=$KEY"
+    curl -sk -o /dev/null -w '%{http_code} ' "https://bookinfo-rhcl.$D/api/v1/products?APIKEY=$KEY"
   done
   echo; sleep 11
 done

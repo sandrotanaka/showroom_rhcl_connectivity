@@ -53,7 +53,7 @@ Leia a segunda linha devagar. Ela não diz apenas que a policy foi sobreposta:
 **nomeia quem venceu**, rota por rota.
 
 A regra: *policies que miram o Gateway valem para toda rota anexada e cedem onde
-a rota declara a sua.* Foi por isso que a UI dava `401` antes do módulo 3.2 — não
+a rota declara a sua.* Foi por isso que a UI dava `403` antes do módulo 3.2 — não
 havia rota declarando nada, então a do gateway valia.
 
 == Exercício 2: o mesmo fork, desenhado
@@ -120,7 +120,7 @@ bash ~/workshop/scripts/workshop.sh diagnostica 34
 ----
 
 *A `prod-web-deny-all` aparece como `Enforced=True`?* Então as policies de rota
-não estão sendo reconhecidas — e a UI estaria em `401`. Volte ao módulo 3.2.
+não estão sendo reconhecidas — e a UI estaria em `403`. Volte ao módulo 3.2.
 ====
 
 == O que isso significa
