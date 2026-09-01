@@ -60,11 +60,48 @@ Escolhemos por três motivos práticos:
 | `ratings` | Node | as notas. Ponta da cadeia.
 |===
 
-== A topologia
+== A mesma aplicação, três vezes
 
-image::topologia.svg[Topologia do bookinfo,align="center"]
+A documentação do Istio explica o bookinfo com **dois** desenhos, e a escolha é
+deliberada: a diferença entre eles é o argumento. Vamos usar os dois, e
+acrescentar um terceiro.
 
-Três coisas para reparar no desenho, porque as três voltam como exercício:
+.Sem Service Mesh — o que o time de aplicação escreveu
+image::istio-noistio.svg[O bookinfo sem Istio: quatro serviços chamando uns aos outros diretamente,align="center",width="640"]
+
+Quatro serviços, quatro linguagens, chamadas HTTP diretas. Não há mTLS, não há
+métrica por serviço, não há trace. Se você quiser qualquer uma dessas três
+coisas aqui, alguém abre um editor de código.
+
+.Com Service Mesh — o mesmo código, com um contêiner a mais em cada pod
+image::istio-withistio.svg[O mesmo bookinfo com sidecars Envoy injetados em cada pod,align="center",width="640"]
+
+Compare os dois desenhos: **os quadrados são os mesmos**. O que apareceu foi um
+Envoy ao lado de cada serviço, e um na borda. Nenhuma linha das quatro
+aplicações mudou — e, a partir daí, mTLS, métrica e trace existem para as
+quatro igualmente.
+
+É essa a frase que o dia inteiro persegue, e ela começa aqui.
+
+.Neste cluster — onde o desenho do upstream deixa de valer
+image::topologia.svg[Topologia do bookinfo neste ambiente,align="center"]
+
+O terceiro é nosso, e existe porque a borda é diferente. Onde o upstream desenha
+um *Ingress Envoy* do Istio, aqui há um `Gateway` da Gateway API publicado por
+uma `Route` do OpenShift — e, na trilha 3, um segundo gateway com policies de
+produto. O miolo continua idêntico ao desenho 2.
+
+[NOTE]
+.Sobre os dois primeiros desenhos
+====
+Eles são do projeto Istio (_Istio Authors_, Apache 2.0), reproduzidos sem
+alteração de
+https://istio.io/latest/docs/examples/bookinfo/[istio.io/docs/examples/bookinfo,window=_blank].
+Os rótulos estão em inglês porque são nomes de serviço e de produto — que, por
+regra deste material, não se traduzem.
+====
+
+Três coisas para reparar no terceiro desenho, porque as três voltam como exercício:
 
 **O gateway não é da aplicação.** Ele é um Envoy na borda, e é onde a trilha 3
 decide quem entra e quanto passa. A aplicação não sabe que ele existe.
