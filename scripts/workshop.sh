@@ -65,6 +65,11 @@ _MODULOS=(
   "34:T3 Precedencia de policies"
   "35:T3 Metrica de negocio"
   "36:T3 A policy nasce com o servico"
+  # O 37 (plugins dos consoles) NAO entra aqui, e a ausencia e deliberada: e
+  # opcional, nao e pre-requisito de nada, e um modulo opcional dentro desta
+  # lista emperraria 'status' e 'proximo' para quem escolheu nao fazer.
+  # 'verifica 37', 'corrige 37' e 'pula 37' funcionam assim mesmo -- o verbo
+  # resolve pelo diretorio validation/module-37, nao por esta lista.
 )
 
 _uso() {
@@ -116,6 +121,16 @@ _lista() {
     [[ -f "${_VAL}/module-${_n}/solve.yml" ]]      && _v+="pula"
     printf '%-4s %-34s %s\n' "$_n" "$_t" "${_v:-—}"
   done
+  # Os opcionais nao estao em _MODULOS, entao sao lidos do disco -- senao o
+  # 'verifica 37' que a pagina 3.7 manda rodar nao apareceria em lugar nenhum.
+  local _op=""
+  for _d in "${_VAL}"/module-*/; do
+    local _n; _n="$(basename "$_d")"; _n="${_n#module-}"
+    [[ -n "$(_titulo "$_n")" ]] || _op+="$_n "
+  done
+  if [[ -n "$_op" ]]; then
+    printf '\n opcionais (fora de status/proximo): %s\n' "${_op% }"
+  fi
   cat <<'EOF'
 
 Todo modulo responde aos quatro verbos. Onde nao ha estado a aplicar ou a

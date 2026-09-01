@@ -26,4 +26,5 @@
 ** xref:33-t3-precedencia.adoc[3.4 Precedência de policies]
 ** xref:34-t3-metricas.adoc[3.5 Métrica de negócio]
 ** xref:35-t3-golden-path.adoc[3.6 A policy nasce com o serviço]
+** xref:36-t3-plugins.adoc[3.7 Plugins dos consoles (opcional)]
 * xref:99-conclusao.adoc[Conclusão]

@@ -1,0 +1,37 @@
+---
+# 3.7 (OPCIONAL) -- so confere que o cluster ficou como estava. Este modulo nao
+# entra em _MODULOS no workshop.sh: ele nao e pre-requisito de nada, e cobrar
+# um modulo opcional em 'status'/'proximo' emperraria a trilha de quem o pulou.
+- name: "3.7 — os consoles continuam inteiros"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Ler a lista de plugins do console"
+      kubernetes.core.k8s_info:
+        api_version: operator.openshift.io/v1
+        kind: Console
+        name: cluster
+      register: r_console
+
+    - name: "Consolidar"
+      ansible.builtin.set_fact:
+        _plugins: "{{ r_console.resources[0].spec.plugins | default([]) }}"
+
+    - name: "Resultado"
+      ansible.builtin.assert:
+        that:
+          - "'kuadrant-console-plugin' in _plugins"
+        success_msg: |
+          OK o kuadrant-console-plugin esta religado -- o cluster ficou como estava
+        fail_msg: |
+          FALHOU o kuadrant-console-plugin nao esta na lista do console.
+
+          O exercicio 2 desliga e manda religar; se voce parou no meio, a aba
+          Connectivity Link (e a Policy Topology) some do console do OpenShift.
+          As policies seguem valendo -- e so a tela. Religue:
+
+            oc patch consoles.operator.openshift.io cluster --type=json \
+              -p '[{"op":"add","path":"/spec/plugins/-","value":"kuadrant-console-plugin"}]'
+
+          ou: bash ~/workshop/scripts/workshop.sh corrige 37

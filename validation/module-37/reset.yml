@@ -1,0 +1,24 @@
+---
+# 3.7 CORRIGE/PULA: religa o plugin do console. Mesmo playbook para os dois
+# verbos -- o estado final deste modulo opcional E o estado inicial dele.
+- name: "3.7 — religar o plugin do console"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Ler a lista atual"
+      kubernetes.core.k8s_info:
+        api_version: operator.openshift.io/v1
+        kind: Console
+        name: cluster
+      register: r_console
+
+    - name: "Religar o kuadrant-console-plugin"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: operator.openshift.io/v1
+          kind: Console
+          metadata: {name: cluster}
+          spec:
+            plugins: "{{ (r_console.resources[0].spec.plugins | default([]) + ['kuadrant-console-plugin']) | unique }}"

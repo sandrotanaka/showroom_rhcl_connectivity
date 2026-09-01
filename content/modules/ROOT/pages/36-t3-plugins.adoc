@@ -1,0 +1,283 @@
+= 3.7 (opcional) Estender os consoles
+:navtitle: 3.7 Plugins (opcional)
+
+*Tempo: 25 minutos* — *módulo opcional*
+
+[WARNING]
+.Isto não é suportado pela Red Hat
+====
+O que este módulo mostra é **mecanismo de produto**; o que você escreve com ele
+**é seu**.
+
+* O OpenShift suporta a *capacidade* de carregar dynamic plugins no console, e o
+  Developer Hub suporta a *capacidade* de carregar dynamic plugins — e mais os
+  plugins que a própria Red Hat empacota e lista como suportados.
+* Um plugin que **você** escreve, ou que vem da comunidade, está fora disso: sem
+  SLA, sem suporte, e a compatibilidade é sua responsabilidade a cada
+  atualização. O contrato é a versão do Backstage (ou do console SDK), não a
+  versão do produto — e ela muda.
+
+Trate este módulo como o que ele é: entender o ponto de extensão para **decidir
+com informação** se vale a pena mantê-lo. A resposta legítima, e frequente, é
+*não vale* — use o plugin que já vem pronto.
+====
+
+[NOTE]
+.Quem executa este módulo
+====
+[cols="1,3"]
+|===
+| *`plat-eng`* | a plataforma. Ligar e desligar plugin do console é operação de
+cluster: mexe no recurso `consoles.operator.openshift.io/cluster`.
+|===
+
+Credenciais e links em xref:03-acessos.adoc[Acessos].
+
+[source,role="execute"]
+----
+oc auth can-i patch consoles.operator.openshift.io/cluster --as=plat-eng
+oc auth can-i patch consoles.operator.openshift.io/cluster --as=acme-trips
+----
+
+`yes` e `no`. Nenhum parceiro liga plugin em console de ninguém.
+====
+
+Você passou o dia inteiro em duas telas: o console do OpenShift e o Developer
+Hub. As duas ganharam abas que não vinham na instalação — a *Policy Topology* do
+Connectivity Link, a aba *Connectivity Link* no portal. Nenhuma das duas foi
+recompilada para isso.
+
+Este módulo abre esse mecanismo.
+
+== Objetivos
+
+* Ver o que é um `ConsolePlugin` e como o console do OpenShift o carrega
+* Ver como o Developer Hub carrega um plugin dinâmico, e de onde
+* Entender por que este workshop tem um plugin próprio — e as duas regras que
+  ele segue
+* Saber onde fica a fronteira do suporte
+
+== Exercício 1: os plugins do console do OpenShift
+
+Um `ConsolePlugin` é um recurso de cluster que diz ao console: *"há mais
+interface disponível, servida por este Service"*. O console a busca em tempo de
+execução — nada é recompilado.
+
+. Veja quantos existem neste cluster:
++
+[source,role="execute"]
+----
+oc get consoleplugin -o custom-columns=NOME:.metadata.name,SERVICO:.spec.backend.service.name,NS:.spec.backend.service.namespace
+----
++
+Doze, e quase todos vieram de operators que você nem instalou à mão. O
+`kuadrant-console-plugin` é o do Connectivity Link.
+
+. Existir não basta — o console só carrega o que está na lista dele:
++
+[source,role="execute"]
+----
+oc get consoles.operator.openshift.io cluster -o jsonpath='{.spec.plugins}' | tr ',' '\n'
+----
++
+[IMPORTANT]
+====
+Note que `kuadrant-console` **existe** como `ConsolePlugin` e **não** está na
+lista; `kuadrant-console-plugin` está. Dois recursos de nomes quase iguais, um
+carregado e o outro não, e o console não reclama de nenhum dos dois.
+
+É o modo de falha típico deste mecanismo: *aba que não aparece* nunca vira erro.
+====
+
+. Olhe o contrato que o Service precisa cumprir:
++
+[source,role="execute"]
+----
+oc exec -n kuadrant-system deploy/kuadrant-console-plugin -- \
+  cat /usr/share/nginx/html/plugin-manifest.json | python3 -c '
+import json, sys, collections
+m = json.load(sys.stdin)
+print("plugin:", m["name"], m["version"])
+print("depende de:", m["dependencies"])
+print("carrega:", m["loadScripts"])
+print()
+for tipo, n in collections.Counter(e["type"] for e in m["extensions"]).most_common():
+    print(f"  {n:3}  {tipo}")
+'
+----
++
+É um manifesto de _Module Federation_ — e a saída é o resumo de tudo que o
+plugin enxerta no console: abas em recursos que ele **não** definiu
+(`console.tab/horizontalNav` em `HTTPRoute`, `Gateway`, `AuthPolicy`), páginas
+novas (`console.page/route`, entre elas a Policy Topology), botões de criar
+(`console.resource/create`) e os itens de menu.
++
+Repare no `dependencies`: `@console/pluginAPI` — e a versão exigida é `*`, ou
+seja, **qualquer uma**. É o contrato com o console, e não a versão do
+Connectivity Link, que decide se um plugin funciona; com `*`, esse contrato não
+é verificado no carregamento. Um plugin assim carrega em qualquer release do
+OpenShift e, se a API mudou, quebra **em uso** — na tela, com o usuário na
+frente — em vez de recusar-se a carregar.
+
+É exatamente o tipo de detalhe que você assume ao manter um plugin próprio.
+
+== Exercício 2: desligar e religar
+
+Se o mecanismo é declarativo, ele desfaz igual.
+
+. Desligue o plugin do Connectivity Link:
++
+[source,role="execute"]
+----
+oc patch consoles.operator.openshift.io cluster --type=json \
+  -p '[{"op":"replace","path":"/spec/plugins","value":'"$(oc get consoles.operator.openshift.io cluster -o json | python3 -c 'import json,sys; p=json.load(sys.stdin)["spec"]["plugins"]; print(json.dumps([x for x in p if x!="kuadrant-console-plugin"]))')"'}]'
+----
+
+. Recarregue o console do OpenShift no navegador (o console pede um _refresh_
+sozinho, com um aviso no topo). A entrada *Connectivity Link* sumiu do menu, e
+com ela a *Policy Topology*.
++
+As policies continuam todas no cluster, valendo, recusando e contando. **Você
+desligou uma tela, não uma política.** Vale sentir essa distinção: é ela que
+separa o plano de controle da interface que o descreve.
+
+. Religue:
++
+[source,role="execute"]
+----
+oc patch consoles.operator.openshift.io cluster --type=json \
+  -p '[{"op":"add","path":"/spec/plugins/-","value":"kuadrant-console-plugin"}]'
+----
+
+== Exercício 3: o mesmo mecanismo no Developer Hub
+
+O Developer Hub carrega plugins por uma ConfigMap, e não por CR.
+
+. Veja de onde vêm os plugins deste portal:
++
+[source,role="execute"]
+----
+NS=$(oc get backstage -A -o jsonpath='{.items[0].metadata.namespace}')
+oc get cm dynamic-plugins-rhdh -n "$NS" -o jsonpath='{.data.dynamic-plugins\.yaml}' \
+  | grep 'package:' | sed 's/.*package: //' | cut -d/ -f1-3 | sort | uniq -c | sort -rn
+----
++
+[NOTE]
+====
+Repare no `-o jsonpath='{.data.dynamic-plugins\.yaml}'` em vez de `{.data}`:
+com `{.data}` a saída vem como JSON com `\n` literais, e todo `grep` a partir
+dali devolve a ConfigMap inteira numa linha só.
+====
++
+*Quatro* origens diferentes, e a diferença importa:
++
+[cols="1,3"]
+|===
+| `./dynamic-plugins/dist/...` | vêm **dentro da imagem** do produto. São os que
+a Red Hat empacota — o Kubernetes, o Topology, as notificações.
+
+| `oci://ghcr.io/redhat-developer/...` | imagens publicadas pela Red Hat para a
+comunidade, buscadas em tempo de instalação. Kiali, Quay, Argo CD.
+
+| `http://plugin-registry:8080/...` | um servidor **dentro deste cluster**. É
+aqui que mora o que não tem build oficial para esta linha do Backstage — e o que
+foi escrito para este workshop.
+
+| `@kuadrant/...@0.4.0` | um pacote npm público, com `integrity` fixado. É o
+plugin do **projeto Kuadrant** — comunidade, não produto.
+|===
+
+[TIP]
+.Duas coisas com o mesmo assunto, de propósito
+====
+As duas últimas origens convivem aqui: o plugin do projeto Kuadrant e o
+`connectivity-link-ops` deste workshop. Não é redundância mal resolvida — é a
+decisão do módulo inteiro em miniatura. O da comunidade traz o que é genérico; o
+próprio traz o que só este ambiente tem (os planos comerciais e o que eles
+significam para um parceiro).
+====
+
+. Olhe o que o `plugin-registry` serve:
++
+[source,role="execute"]
+----
+oc exec -n $(oc get backstage -A -o jsonpath='{.items[0].metadata.namespace}') \
+  deploy/plugin-registry -- ls /opt/app-root/src
+----
++
+Entre eles, `rhcl-backstage-plugin-connectivity-link-ops`. Esse é o plugin de
+Connectivity Link deste ambiente — e ele não existe em catálogo nenhum: foi
+escrito para esta demo, com um frontend e um backend.
+
+. Veja como ele se declara ao portal:
++
+[source,role="execute"]
+----
+oc get cm dynamic-plugins-rhdh -n "$NS" -o jsonpath='{.data.dynamic-plugins\.yaml}' \
+  | grep -A 26 'connectivity-link-ops-0.*tgz'
+----
++
+`dynamicRoutes` cria a rota `/connectivity-link` e o item de menu;
+`mountPoints` enxerta cartões na página de entidades do catálogo. O plugin **não
+altera** o Backstage: ele se pendura em pontos que o Backstage expõe.
+
+== O que custa manter um plugin próprio
+
+Este workshop tem um, então dá para falar com números em vez de opinião.
+
+[cols="1,3"]
+|===
+| *Alvo de build* | Backstage `1.49.4` — lido de `/opt/app-root/src/backstage.json`
+**dentro do pod**, e não da versão do RHDH. Errar isso compila e falha só na
+hora de carregar.
+
+| *Toolchain* | Node ≥ 20.12. Node 16 falha no _engine check_ com uma mensagem
+que não cita a versão.
+
+| *Sequência* | `yarn tsc` **antes** de `yarn build`, sempre, e depois
+`yarn export-dynamic`. Fora de ordem, o build passa e o artefato sai
+incompleto.
+
+| *A cada upgrade* | do RHDH, revalidar. O contrato é a versão do Backstage, e
+ela muda entre releases do produto.
+|===
+
+E as duas regras que esse plugin segue, que valem para qualquer um que você
+escreva:
+
+*Real-only.* O que não é mensurável renderiza um `Não disponível` explícito —
+nunca zero. Zero é um número; num painel, zero mentiroso destrói a confiança em
+todos os outros números da tela.
+
+*RBAC explicado.* Quando falta permissão, a tela diz **qual verbo falta**, em
+vez de mostrar um `403` no console do navegador. Compare com o que você viu no
+módulo xref:16-t1-rbac.adoc[1.6]: a diferença entre "não posso" e "não posso
+_porque_" é a diferença entre um chamado aberto e um problema resolvido.
+
+== Como decidir
+
+A pergunta certa não é *"dá para escrever um plugin?"* — dá. É *"o que acontece
+com ele daqui a duas releases?"*
+
+Vale escrever quando::
+o que você precisa mostrar não existe em lugar nenhum e é específico do seu
+negócio — um plano comercial, um SLA de parceiro, uma métrica que só a sua
+empresa tem.
+
+Não vale escrever quando::
+o plugin pronto já faz. Este ambiente é o exemplo: CRUD de policy, Policy
+Topology, API Products e Keys ficaram **todos** no `kuadrant-console-plugin`, e
+o portal manda para lá por link em vez de reimplementar. Reimplementar teria
+dobrado o código e a manutenção para chegar ao mesmo lugar.
+
+[NOTE]
+.Este módulo não entra na sua trilha
+====
+Ele é opcional e fica fora de `status` e `proximo` — nada aqui é pré-requisito
+de nada. Se quiser conferir mesmo assim que deixou o cluster como encontrou:
+
+[source,role="execute"]
+----
+bash ~/workshop/scripts/workshop.sh verifica 37
+----
+====
